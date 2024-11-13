@@ -8,13 +8,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Activity, Waves, LineChart, BarChart2, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, Bell, Pin, Settings } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 
 type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h';
 
@@ -41,6 +45,12 @@ const getSignalColor = (signal: SignalType) => {
   }
 };
 
+// Add this new interface near other interfaces
+interface ColorChangeTimestamp {
+  timestamp: number;
+  color: 'red' | 'green';
+}
+
 // Add new interface for the WebSocket message
 interface WaveTrendMessage {
   type: string;
@@ -49,6 +59,7 @@ interface WaveTrendMessage {
   timestamp: string;
   wt1: number;
   wt2: number;
+  rsi: number;
   sma50: number;
   sma200: number;
 }
@@ -56,39 +67,56 @@ interface WaveTrendMessage {
 interface TradingPair {
   symbol: string;
   price?: number;
+  alerts?: boolean;
+  pinned?: boolean;
   signals: Record<Timeframe, SignalType>;
   indicators: Record<Timeframe, {
     wt1: number;
     wt2: number;
     sma50: number;
     sma200: number;
+    rsi: number;
+    colorChanges?: {
+      wt1?: ColorChangeTimestamp;
+      wt2?: ColorChangeTimestamp;
+    };
+    signals?: {
+      bearish_divergence: boolean;
+      bullish_divergence: boolean;
+      hidden_bearish_divergence: boolean;
+      hidden_bullish_divergence: boolean;
+      overbought: boolean;
+      oversold: boolean;
+      price_above_sma50: boolean;
+      price_above_sma200: boolean;
+      sma50_above_sma200: boolean;
+    };
   }>;
   order?: number;
 }
 
-// Modified function to calculate signal including extreme conditions
-const calculateSignal = (wt: number): SignalType => {
-  const EXTREME_THRESHOLD = 80;
-  const BUY_THRESHOLD = -53;
-  const SELL_THRESHOLD = 53;
+// Modify calculateSignal to accept settings as a parameter
+const calculateSignal = (wt: number, settings: WaveTrendSettings): SignalType => {
+  console.log('Calculating signal:', { wt, settings });
+  
   const TRANSITION_PERCENTAGE = 0.05;
   
-  const buyTransitionZone = BUY_THRESHOLD + (Math.abs(BUY_THRESHOLD) * TRANSITION_PERCENTAGE);
-  const sellTransitionZone = SELL_THRESHOLD - (SELL_THRESHOLD * TRANSITION_PERCENTAGE);
+  const buyTransitionZone = settings.buyThreshold + (Math.abs(settings.buyThreshold) * TRANSITION_PERCENTAGE);
+  const sellTransitionZone = settings.sellThreshold - (settings.sellThreshold * TRANSITION_PERCENTAGE);
 
-  if (wt <= -EXTREME_THRESHOLD) {
+  if (wt <= settings.extremeBuyThreshold) {
     return 'extreme-buy';
   }
-  if (wt >= EXTREME_THRESHOLD) {
+  if (wt >= settings.extremeSellThreshold) {
     return 'extreme-sell';
   }
-  if (wt <= BUY_THRESHOLD) {
+  if (wt <= settings.buyThreshold) {
     return 'buy';
   }
   if (wt <= buyTransitionZone) {
     return 'near-buy';
   }
-  if (wt >= SELL_THRESHOLD) {
+  if (wt >= settings.sellThreshold) {
     return 'sell';
   }
   if (wt >= sellTransitionZone) {
@@ -127,17 +155,25 @@ interface IndicatorMessage {
   type: 'indicators';
   symbol: string;
   timeframe: string;
+  timestamp: string;
+  price: number;
+  rsi: number;
   wt1: number;
   wt2: number;
   sma50: number;
   sma200: number;
-  price: number;
   signals: {
+    bearish_divergence: boolean;
+    bullish_divergence: boolean;
     cross_over: boolean;
     cross_under: boolean;
+    hidden_bearish_divergence: boolean;
+    hidden_bullish_divergence: boolean;
     overbought: boolean;
     oversold: boolean;
     price_above_sma50: boolean;
+    price_above_sma200: boolean;
+    sma50_above_sma200: boolean;
   };
 }
 
@@ -166,6 +202,64 @@ const countBuySignals = (pair: TradingPair): number => {
   }, 0);
 };
 
+// Add these constants right after the imports and before any type definitions
+const EXTREME_THRESHOLD = 80;  // For WaveTrend extreme signals
+const RSI_OVERBOUGHT = 70;     // For RSI overbought
+const RSI_OVERSOLD = 30;       // For RSI oversold
+
+// Add this near the top of the file after imports
+const NOTIFICATION_SETTINGS_KEY = 'pairNotificationSettings';
+
+// Add this interface with the other interfaces
+interface NotificationSettings {
+  [symbol: string]: boolean;
+}
+
+// Replace the audio file constant and add this utility function
+const createBellSound = () => {
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  
+  return () => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Bell-like sound settings
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(830, audioContext.currentTime); // Higher frequency for bell sound
+    
+    // Volume envelope
+    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+    
+    // Play sound
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+  };
+};
+
+// Add these constants at the top of the file
+const SETTINGS_KEY = 'waveTrendSettings';
+const DEFAULT_SETTINGS = {
+  buyThreshold: -53,
+  sellThreshold: 53,
+  extremeBuyThreshold: -80,
+  extremeSellThreshold: 80
+};
+
+// Add this interface with other interfaces
+interface WaveTrendSettings {
+  buyThreshold: number;
+  sellThreshold: number;
+  extremeBuyThreshold: number;
+  extremeSellThreshold: number;
+}
+
+// Add this constant with other constants
+const PINNED_PAIRS_KEY = 'pinnedPairs';
+
 const PairsTable = () => {
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -176,6 +270,11 @@ const PairsTable = () => {
   const [timeframes, setTimeframes] = useState<Timeframe[]>([]);
   const [crossSignals, setCrossSignals] = useState<CrossSignals[]>([]);
   const [sortByBuySignals, setSortByBuySignals] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({});
+  const [playBell, setPlayBell] = useState<(() => void) | null>(null);
+  const [settings, setSettings] = useState<WaveTrendSettings>(DEFAULT_SETTINGS);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Load saved order on mount
   useEffect(() => {
@@ -198,8 +297,46 @@ const PairsTable = () => {
     }
   }, []);
 
+  // Replace the audio initialization effect with this
+  useEffect(() => {
+    // Initialize bell sound
+    setPlayBell(() => createBellSound());
+    
+    // Load notification settings from localStorage
+    const savedSettings = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+    if (savedSettings) {
+      setNotificationSettings(JSON.parse(savedSettings));
+    }
+  }, []);
+
+  // Add this effect to load saved settings
+  useEffect(() => {
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    if (savedSettings) {
+      setSettings(JSON.parse(savedSettings));
+    }
+  }, []);
+
+  // Add useEffect to load pinned pairs on mount
+  useEffect(() => {
+    const savedPinnedPairs = localStorage.getItem(PINNED_PAIRS_KEY);
+    if (savedPinnedPairs) {
+      const pinnedPairsMap = JSON.parse(savedPinnedPairs);
+      setPairs(current => 
+        current.map(pair => ({
+          ...pair,
+          pinned: pinnedPairsMap[pair.symbol] || false
+        }))
+      );
+    }
+  }, []);
+
   const handleIndicatorMessage = (data: IndicatorMessage) => {
-    const signal = calculateSignal(data.wt1);
+    console.log('Received indicator message:', data);
+    console.log('Current settings:', settings);
+    
+    const signal = calculateSignal(data.wt1, settings);
+    console.log('Calculated signal:', signal);
     
     // Update timeframes if we receive a new one
     setTimeframes(current => {
@@ -230,6 +367,7 @@ const PairsTable = () => {
                   [data.timeframe]: {
                     wt1: data.wt1,
                     wt2: data.wt2,
+                    rsi: data.rsi,
                     sma50: data.sma50,
                     sma200: data.sma200
                   }
@@ -247,12 +385,14 @@ const PairsTable = () => {
             [data.timeframe]: {
               wt1: data.wt1,
               wt2: data.wt2,
+              rsi: data.rsi,
               sma50: data.sma50,
               sma200: data.sma200
             }
           } as Record<Timeframe, {
             wt1: number;
             wt2: number;
+            rsi: number;
             sma50: number;
             sma200: number;
           }>
@@ -290,14 +430,21 @@ const PairsTable = () => {
         return [...filtered, newSignal];
       });
     }
+
+    // Check for green signal on 1m timeframe and play sound if notifications are enabled
+    if (data.timeframe === '1m' && 
+        notificationSettings[data.symbol] && 
+        (data.wt1 <= -53 || data.wt2 <= -53)) {
+      playBell?.();
+    }
   };
 
   const connectWebSocket = () => {
     setIsLoading(true);
     
     try {
-        //const url = 'ws://localhost:8765'
-        const url = 'wss://your-trading-bot.fly.dev/ws'
+        const url = 'ws://localhost:8765'
+        //const url = 'wss://your-trading-bot.fly.dev/ws'
 
         console.log('🔄 Attempting WebSocket connection to:', url);
         
@@ -427,8 +574,8 @@ const PairsTable = () => {
     return (
       <div className={getSignalColor(pair.signals[timeframe])}>
         <span className="text-[8px]">
-         WT1: {indicator.wt1.toFixed(2)}, 
-          WT2: {indicator.wt2.toFixed(2)}<br/>
+         WT1: {indicator.wt1?.toFixed(2)}, 
+          WT2: {indicator.wt2?.toFixed(2)}<br/>
             {/*SMA50: {indicator.sma50.toFixed(2)},
           SMA200: {indicator.sma200.toFixed(2)} */}
         </span>
@@ -470,14 +617,67 @@ const PairsTable = () => {
     setPairs(items);
   };
 
+  const filteredPairs = pairs.filter(pair =>
+    pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const toggleAlert = (symbol: string) => {
+    setPairs(current =>
+      current.map(pair =>
+        pair.symbol === symbol
+          ? { ...pair, alerts: !pair.alerts }
+          : pair
+      )
+    );
+
+    // Update notification settings in state and localStorage
+    setNotificationSettings(prev => {
+      const newSettings = {
+        ...prev,
+        [symbol]: !prev[symbol]
+      };
+      localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(newSettings));
+      return newSettings;
+    });
+  };
+
+  // Update the togglePin function to use localStorage
+  const togglePin = (symbol: string) => {
+    setPairs(current => {
+      const updatedPairs = current.map(pair =>
+        pair.symbol === symbol
+          ? { ...pair, pinned: !pair.pinned }
+          : pair
+      );
+      
+      // Save pinned status to localStorage
+      const pinnedPairsMap = updatedPairs.reduce((acc, pair) => ({
+        ...acc,
+        [pair.symbol]: pair.pinned
+      }), {});
+      localStorage.setItem(PINNED_PAIRS_KEY, JSON.stringify(pinnedPairsMap));
+      
+      return updatedPairs;
+    });
+  };
+
+  // Modify your sorting logic to account for pins
   const sortedPairs = sortByBuySignals 
-    ? [...pairs].sort((a, b) => {
+    ? [...filteredPairs].sort((a, b) => {
+        // First sort by pinned status
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        // Then by buy signals
         const aCount = countBuySignals(a);
         const bCount = countBuySignals(b);
-        console.log(`${a.symbol}: ${aCount} buys, ${b.symbol}: ${bCount} buys`);
         return bCount - aCount;
       })
-    : pairs;
+    : filteredPairs.sort((a, b) => {
+        // Sort only by pinned status when not sorting by buy signals
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return 0;
+      });
 
   // Update the toggle handler
   const handleSortToggle = () => {
@@ -486,9 +686,131 @@ const PairsTable = () => {
     localStorage.setItem('sortByBuySignals', JSON.stringify(newValue));
   };
 
+  const renderIndicators = useCallback((pair: TradingPair, timeframe: Timeframe) => {
+    const indicator = pair.indicators[timeframe];
+    
+    if (!indicator) {
+      return (
+        <div className="text-muted-foreground">
+          <Activity className="w-4 h-4 animate-pulse" />
+        </div>
+      );
+    }
+
+    const getIndicatorColor = (value: number, type: 'wt' | 'rsi' | 'sma') => {
+      if (type === 'wt') {
+        if (value >= EXTREME_THRESHOLD) return "text-red-500";
+        if (value <= -EXTREME_THRESHOLD) return "text-green-500";
+        if (value >= 53) return "text-red-400";
+        if (value <= -53) return "text-green-400";
+        return "text-blue-400";
+      } else if (type === 'rsi') {
+        if (value >= RSI_OVERBOUGHT) return "text-red-500";
+        if (value <= RSI_OVERSOLD) return "text-green-500";
+        return "text-blue-400";
+      } else { // sma
+        return indicator.signals?.price_above_sma50 ? "text-green-400" : "text-red-400";
+      }
+    };
+
+    return (
+      <div className="flex flex-col gap-0.5 p-0.5">
+        {/* WaveTrend 1 and 2 */}
+        <div className="flex flex-row items-center justify-center gap-1">
+          <div className={cn(
+            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+            "bg-background/50 hover:bg-background/80 transition-colors",
+            getIndicatorColor(indicator.wt1, 'wt')
+          )}>
+            <Waves className="w-3 h-3" />
+            <span className="text-xs font-medium">
+              {indicator.wt1?.toFixed(1)}
+            </span>
+          </div>
+          <div className={cn(
+            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+            "bg-background/50 hover:bg-background/80 transition-colors",
+            getIndicatorColor(indicator.wt2, 'wt')
+          )}>
+            <Waves className="w-3 h-3" />
+            <span className="text-xs font-medium">
+              {indicator.wt2?.toFixed(1)}
+            </span>
+          </div>
+        </div>
+
+        {/* RSI and SMA50 */}
+        <div className="flex flex-row items-center justify-center gap-1">
+          <div className={cn(
+            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+            "bg-background/50 hover:bg-background/80 transition-colors",
+            getIndicatorColor(indicator.rsi, 'rsi')
+          )}>
+            <LineChart className="w-3 h-3" />
+            <span className="text-xs font-medium">
+              {indicator.rsi?.toFixed(1)}
+            </span>
+          </div>
+          <div className={cn(
+            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+            "bg-background/50 hover:bg-background/80 transition-colors",
+            getIndicatorColor(indicator.sma50, 'sma')
+          )}>
+            <BarChart2 className="w-3 h-3" />
+            <span className="text-xs font-medium">
+              {indicator.sma50?.toFixed(1)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }, []);
+
+  // Add this function to test the bell sound
+  const testBellSound = () => {
+    playBell?.();
+  };
+
+  // Modify saveSettings to include debugging
+  const saveSettings = (newSettings: WaveTrendSettings) => {
+    console.log('Saving new settings:', newSettings);
+    setSettings(newSettings);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+    
+    // Recalculate signals for all pairs with new settings
+    setPairs(currentPairs => {
+      console.log('Current pairs before update:', currentPairs);
+      
+      const updatedPairs = currentPairs.map(pair => {
+        const newSignals = Object.entries(pair.indicators).reduce((acc, [timeframe, indicator]) => {
+          const newSignal = calculateSignal(indicator.wt1, newSettings);
+          console.log(`Recalculating for ${pair.symbol} ${timeframe}:`, {
+            wt1: indicator.wt1,
+            threshold: newSettings.buyThreshold,
+            newSignal
+          });
+          return {
+            ...acc,
+            [timeframe]: newSignal
+          };
+        }, {} as Record<Timeframe, SignalType>);
+
+        return {
+          ...pair,
+          signals: newSignals
+        };
+      });
+
+      console.log('Updated pairs:', updatedPairs);
+      return updatedPairs;
+    });
+    
+    setShowSettingsModal(false);
+  };
+
   return (
     <div className="space-y-4 w-full">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-4">
         <div className="flex items-center space-x-2">
           <Switch
             id="sort-mode"
@@ -499,19 +821,113 @@ const PairsTable = () => {
             Sort by Buy Signals {sortByBuySignals && `(Active)`}
           </Label>
         </div>
+        <div className="flex items-center space-x-2">
+          <Input
+            type="search"
+            placeholder="Search tokens..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-xs"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowSettingsModal(true)}
+            className="h-9 w-9"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Add the Settings Modal */}
+      <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>WaveTrend Settings</DialogTitle>
+            <DialogDescription>
+              Customize the thresholds for WaveTrend signals
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            const newSettings = {
+              buyThreshold: Number(formData.get('buyThreshold')),
+              sellThreshold: Number(formData.get('sellThreshold')),
+              extremeBuyThreshold: Number(formData.get('extremeBuyThreshold')),
+              extremeSellThreshold: Number(formData.get('extremeSellThreshold'))
+            };
+            saveSettings(newSettings);
+          }}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="buyThreshold" className="text-right">
+                  Buy Signal
+                </Label>
+                <Input
+                  id="buyThreshold"
+                  name="buyThreshold"
+                  type="number"
+                  defaultValue={settings.buyThreshold}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="sellThreshold" className="text-right">
+                  Sell Signal
+                </Label>
+                <Input
+                  id="sellThreshold"
+                  name="sellThreshold"
+                  type="number"
+                  defaultValue={settings.sellThreshold}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="extremeBuyThreshold" className="text-right">
+                  Extreme Buy
+                </Label>
+                <Input
+                  id="extremeBuyThreshold"
+                  name="extremeBuyThreshold"
+                  type="number"
+                  defaultValue={settings.extremeBuyThreshold}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="extremeSellThreshold" className="text-right">
+                  Extreme Sell
+                </Label>
+                <Input
+                  id="extremeSellThreshold"
+                  name="extremeSellThreshold"
+                  type="number"
+                  defaultValue={settings.extremeSellThreshold}
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit">Save changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       <div className="relative overflow-x-auto bg-background dark:bg-gray-900 rounded-lg w-full">
         <DragDropContext onDragEnd={onDragEnd}>
           <Table>
             <TableHeader>
               <TableRow className="border-b dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <TableHead className="text-left text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50">Symbol</TableHead>
-                <TableHead className="text-right text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50">Price</TableHead>
+                <TableHead className="text-left w-[140px]">Symbol</TableHead>
+                <TableHead className="text-right w-[80px]">Price</TableHead>
                 {timeframes.map((tf) => (
                   <TableHead 
                     key={tf} 
-                    className="text-center text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50"
+                    className="text-center text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50 w-[140px] px-3"
                   >
                     {tf}
                   </TableHead>
@@ -541,81 +957,78 @@ const PairsTable = () => {
                             "cursor-move" // Add cursor indicator
                           )}
                         >
-                          <TableCell className="font-medium text-gray-900 dark:text-gray-100">
+                          <TableCell className="w-[140px]">
                             <div className="flex items-center gap-2">
                               {pair.symbol}
-                              {sortByBuySignals && (
-                                <Badge 
-                                  variant="secondary" 
-                                  className="text-xs"
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    "icon-button h-7 w-7",
+                                    notificationSettings[pair.symbol]
+                                      ? "text-amber-500 active-icon" 
+                                      : "text-gray-400 hover:text-amber-400"
+                                  )}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleAlert(pair.symbol);
+                                  }}
                                 >
-                                  {countBuySignals(pair)} buys
-                                </Badge>
-                              )}
+                                  <Bell
+                                    className={cn(
+                                      "bell-icon h-4 w-4",
+                                      notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                                    )}
+                                  />
+                                </Button>
+                                {/* Add the test button here */}
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={testBellSound}
+                                  className="h-7 w-7"
+                                >
+                                  Test
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    "icon-button h-7 w-7",
+                                    pair.pinned 
+                                      ? "text-blue-500 active-icon" 
+                                      : "text-gray-400 hover:text-blue-400"
+                                  )}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePin(pair.symbol);
+                                  }}
+                                >
+                                  <Pin
+                                    className={cn(
+                                      "pin-icon h-4 w-4",
+                                      pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                                    )}
+                                  />
+                                </Button>
+                                {sortByBuySignals && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {countBuySignals(pair)} buys
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-gray-900 dark:text-gray-100">
+                          <TableCell className="text-right pr-6">
                             {pair.price?.toFixed(2)}
                           </TableCell>
                           {timeframes.map((tf) => (
-                            <TableCell key={tf} className="text-center relative">
-                              <div className="flex flex-col items-center justify-center gap-1">
-                                <div className="flex items-center gap-1">
-                                  <div className={cn(
-                                    "flex items-center gap-1",
-                                    getSignalColor(calculateSignal(pair.indicators[tf]?.wt1 ?? 0))
-                                  )}>
-                                    <div className="w-2 h-2 rounded-full bg-current" />
-                                    <span className="text-[8px]">WT1</span>
-                                  </div>
-                                  <div className={cn(
-                                    "flex items-center gap-1",
-                                    getSignalColor(calculateSignal(pair.indicators[tf]?.wt2 ?? 0))
-                                  )}>
-                                    <div className="w-2 h-2 rounded-full bg-current" />
-                                    <span className="text-[8px]">WT2</span>
-                                  </div>
-                                </div>
-                                
-                                {/* Cross signals */}
-                                {getCrossSignal(pair.symbol, tf) && (
-                                  <div className={cn(
-                                    "transition-opacity duration-200",
-                                    "absolute top-0 right-0 m-1"
-                                  )}>
-                                    {getCrossSignal(pair.symbol, tf)?.type === 'cross_over' ? (
-                                      <ArrowUpCircle 
-                                        className="w-4 h-4 text-green-500 animate-pulse" 
-                                        aria-label="Cross Over"
-                                      />
-                                    ) : (
-                                      <ArrowDownCircle 
-                                        className="w-4 h-4 text-red-500 animate-pulse" 
-                                        aria-label="Cross Under"
-                                      />
-                                    )}
-                                  </div>
-                                )}
-                                
-                                {(Math.abs(pair.indicators[tf]?.wt1 ?? 0) >= 80 || Math.abs(pair.indicators[tf]?.wt2 ?? 0) >= 80) && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className={cn(
-                                      "px-1 py-0 text-[6px] h-4 whitespace-nowrap",
-                                      "bg-red-500/20 dark:bg-red-500/20", // Semi-transparent background
-                                      "text-red-700 dark:text-red-300", // Text color for light/dark modes
-                                      "border-red-500/50 dark:border-red-500/50", // Border color
-                                      "animate-[blink_2s_ease-in-out_infinite]" // Animation
-                                    )}
-                                  >
-                                    EXTREME {(pair.indicators[tf]?.wt1 ?? 0) < 0 ? 'BUY' : 'SELL'}
-                                  </Badge>
-                                )}
-                                
-                                <span className="text-[8px] text-gray-500 dark:text-gray-400">
-                                  {pair.indicators[tf]?.wt1?.toFixed(2) ?? 'N/A'} / {pair.indicators[tf]?.wt2?.toFixed(2) ?? 'N/A'}
-                                </span>
-                              </div>
+                            <TableCell 
+                              key={tf} 
+                              className="text-center relative w-[140px] px-3"
+                            >
+                              {renderIndicators(pair, tf)}
                             </TableCell>
                           ))}
                         </TableRow>

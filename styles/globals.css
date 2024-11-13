@@ -101,3 +101,52 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Add these animations to your existing globals.css */
+@keyframes wiggle {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-12deg) scale(1.2); }
+  50% { transform: rotate(0deg) scale(1.2); }
+  75% { transform: rotate(12deg) scale(1.2); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes bounce {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.2); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.icon-button {
+  @apply relative overflow-hidden transition-all duration-300;
+}
+
+.icon-button::after {
+  content: '';
+  @apply absolute inset-0 rounded-full bg-current opacity-0 transition-opacity duration-300;
+}
+
+.icon-button:hover::after {
+  @apply opacity-10;
+}
+
+.bell-icon {
+  @apply transition-transform duration-300 ease-in-out;
+}
+
+.bell-icon:hover {
+  @apply transform scale-110;
+}
+
+.pin-icon {
+  @apply transition-transform duration-300 ease-in-out;
+}
+
+.pin-icon:hover {
+  @apply transform scale-110;
+}
+
+.active-icon {
+  @apply shadow-lg;
+  filter: drop-shadow(0 0 4px currentColor);
+}

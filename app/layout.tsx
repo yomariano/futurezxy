@@ -1,8 +1,8 @@
 import '../styles/globals.css'
 import { Inter } from 'next/font/google'
-import Navbar from '@/components/Navbar'
 import { ThemeProvider } from "next-themes"
 import { cn } from "@/lib/utils"
+import DashboardLayout from "@/components/layouts/DashboardLayout"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,19 +19,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn(
-        inter.className,
-        "min-h-screen bg-background dark:bg-background"
+        "min-h-screen bg-background font-sans antialiased",
+        inter.variable
       )}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
-          themes={["light", "dark", "black-and-white"]}
         >
-          <div className="relative min-h-screen flex bg-background dark:bg-background">
+          <DashboardLayout>
             {children}
-          </div>
+          </DashboardLayout>
         </ThemeProvider>
       </body>
     </html>
