@@ -1,6 +1,8 @@
 "use client"
 
-import { LineChart, Settings, PanelLeftClose, PanelLeft, BarChart2Icon, SettingsIcon, CreditCardIcon } from "lucide-react"
+import { LineChart, Settings, PanelLeftClose, PanelLeft, BarChart2Icon, SettingsIcon, CreditCardIcon, LogOut } from "lucide-react"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -16,8 +18,16 @@ const sidebarItems = [
 ]
 
 export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
+  const router = useRouter()
+  const supabase = createClientComponentClient()
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <div className={cn("fixed left-0 top-0 bottom-0 w-64 border-r hidden md:block", { "w-16": isCollapsed })}>
@@ -69,8 +79,21 @@ export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
           )
         })}
       </nav>
-      <div className="mt-auto p-4 border-t">
-        <ChatBot />
+      <div className="mt-auto border-t">
+        <button
+          onClick={handleSignOut}
+          className={cn(
+            "flex items-center w-full px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/50",
+            isCollapsed && "justify-center"
+          )}
+          title={isCollapsed ? "Sign Out" : undefined}
+        >
+          <LogOut className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+          {!isCollapsed && "Sign Out"}
+        </button>
+        <div className="p-4">
+          <ChatBot />
+        </div>
       </div>
     </div>
   )

@@ -1,9 +1,39 @@
+'use client'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronRight, BarChart2, TrendingUp, AlertCircle, Zap, Lock, CheckCircle2, LineChart, Smartphone, BookOpen, Unlock, Crown, User } from 'lucide-react'
+import AuthButton from '@/components/AuthButton'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
 
 export default function Component() {
+  const supabase = createClientComponentClient()
+  const router = useRouter()
+
+  const handleGetStarted = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (session) {
+      router.push('/signals')
+    } else {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
+      })
+      
+      if (error) {
+        console.error('Authentication error:', error.message)
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen w-full">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -26,10 +56,8 @@ export default function Component() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" className="text-base font-bold">
-              Log in
-            </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <AuthButton />
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGetStarted}>
               Get Started
             </Button>
           </div>
@@ -48,7 +76,7 @@ export default function Component() {
                 </p>
               </div>
               <div className="space-x-4">
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGetStarted}>
                   Get Started
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
