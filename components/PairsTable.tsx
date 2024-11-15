@@ -26,7 +26,7 @@ type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h';
 type SignalType = 'buy' | 'sell' | 'neutral' | 'near-buy' | 'near-sell' | 'extreme-buy' | 'extreme-sell';
 
 // Update the color function
-const getSignalColor = (signal: SignalType) => {
+const getSignalColor = (signal: SignalType, settings: WaveTrendSettings) => {
   switch (signal) {
     case 'extreme-buy':
       return 'text-green-600 dark:text-green-500';
@@ -260,6 +260,39 @@ interface WaveTrendSettings {
 // Add this constant with other constants
 const PINNED_PAIRS_KEY = 'pinnedPairs';
 
+// Add this near your other utility functions
+const showNotification = (symbol: string, message: string) => {
+  console.log('Attempting to show notification:', { symbol, message });
+  
+  if ('Notification' in window) {
+    console.log('Notification permission:', Notification.permission);
+    
+    if (Notification.permission === 'granted') {
+      const notificationSettings = JSON.parse(localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || '{}');
+      console.log('Notification settings:', notificationSettings);
+      
+      if (notificationSettings[symbol]) {
+        try {
+          new Notification(`${symbol} Alert`, {
+            body: message,
+            icon: '/favicon.ico'
+          });
+          console.log('Notification sent successfully');
+        } catch (error) {
+          console.error('Error sending notification:', error);
+        }
+      }
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        console.log('Permission requested:', permission);
+        if (permission === 'granted') {
+          showNotification(symbol, message); // Try again if permission was just granted
+        }
+      });
+    }
+  }
+};
+
 const PairsTable = () => {
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -331,6 +364,13 @@ const PairsTable = () => {
     }
   }, []);
 
+  // Add this useEffect to request notification permission on component mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const handleIndicatorMessage = (data: IndicatorMessage) => {
     console.log('Received indicator message:', data);
     console.log('Current settings:', settings);
@@ -350,9 +390,29 @@ const PairsTable = () => {
     setPairs(currentPairs => {
       // Find existing pair
       const existingPair = currentPairs.find(p => p.symbol === data.symbol);
+      const previousSignal = existingPair?.signals[data.timeframe as Timeframe];
       
+      // Check if this is a new buy signal
+      const isNewBuySignal = (
+        signal === 'buy' || 
+        signal === 'extreme-buy' || 
+        signal === 'near-buy'
+      ) && previousSignal !== signal;
+
+      // If it's a new buy signal on 1m timeframe, trigger notification
+      if (data.timeframe === '1m' && 
+          isNewBuySignal && 
+          notificationSettings[data.symbol]) {
+        console.log('Triggering notification for:', data.symbol);
+        playBell?.();
+        showNotification(
+          data.symbol,
+          `New buy signal detected (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`
+        );
+      }
+
+      // Update pair data
       if (existingPair) {
-        // Update existing pair
         return currentPairs.map(pair => 
           pair.symbol === data.symbol
             ? {
@@ -369,7 +429,8 @@ const PairsTable = () => {
                     wt2: data.wt2,
                     rsi: data.rsi,
                     sma50: data.sma50,
-                    sma200: data.sma200
+                    sma200: data.sma200,
+                    signals: data.signals
                   }
                 }
               }
@@ -429,13 +490,6 @@ const PairsTable = () => {
         );
         return [...filtered, newSignal];
       });
-    }
-
-    // Check for green signal on 1m timeframe and play sound if notifications are enabled
-    if (data.timeframe === '1m' && 
-        notificationSettings[data.symbol] && 
-        (data.wt1 <= -53 || data.wt2 <= -53)) {
-      playBell?.();
     }
   };
 
@@ -571,13 +625,14 @@ const PairsTable = () => {
       );
     }
     
+    // Recalculate signal using current settings
+    const currentSignal = calculateSignal(indicator.wt1, settings);
+    
     return (
-      <div className={getSignalColor(pair.signals[timeframe])}>
+      <div className={getSignalColor(currentSignal, settings)}>
         <span className="text-[8px]">
          WT1: {indicator.wt1?.toFixed(2)}, 
           WT2: {indicator.wt2?.toFixed(2)}<br/>
-            {/*SMA50: {indicator.sma50.toFixed(2)},
-          SMA200: {indicator.sma200.toFixed(2)} */}
         </span>
       </div>
     );
@@ -699,10 +754,10 @@ const PairsTable = () => {
 
     const getIndicatorColor = (value: number, type: 'wt' | 'rsi' | 'sma') => {
       if (type === 'wt') {
-        if (value >= EXTREME_THRESHOLD) return "text-red-500";
-        if (value <= -EXTREME_THRESHOLD) return "text-green-500";
-        if (value >= 53) return "text-red-400";
-        if (value <= -53) return "text-green-400";
+        if (value >= settings.extremeSellThreshold) return "text-red-500";
+        if (value <= settings.extremeBuyThreshold) return "text-green-500";
+        if (value >= settings.sellThreshold) return "text-red-400";
+        if (value <= settings.buyThreshold) return "text-green-400";
         return "text-blue-400";
       } else if (type === 'rsi') {
         if (value >= RSI_OVERBOUGHT) return "text-red-500";
@@ -764,7 +819,7 @@ const PairsTable = () => {
         </div>
       </div>
     );
-  }, []);
+  }, [settings]);
 
   // Add this function to test the bell sound
   const testBellSound = () => {
@@ -779,19 +834,11 @@ const PairsTable = () => {
     
     // Recalculate signals for all pairs with new settings
     setPairs(currentPairs => {
-      console.log('Current pairs before update:', currentPairs);
-      
-      const updatedPairs = currentPairs.map(pair => {
+      return currentPairs.map(pair => {
         const newSignals = Object.entries(pair.indicators).reduce((acc, [timeframe, indicator]) => {
-          const newSignal = calculateSignal(indicator.wt1, newSettings);
-          console.log(`Recalculating for ${pair.symbol} ${timeframe}:`, {
-            wt1: indicator.wt1,
-            threshold: newSettings.buyThreshold,
-            newSignal
-          });
           return {
             ...acc,
-            [timeframe]: newSignal
+            [timeframe]: calculateSignal(indicator.wt1, newSettings)
           };
         }, {} as Record<Timeframe, SignalType>);
 
@@ -800,17 +847,15 @@ const PairsTable = () => {
           signals: newSignals
         };
       });
-
-      console.log('Updated pairs:', updatedPairs);
-      return updatedPairs;
     });
     
     setShowSettingsModal(false);
   };
 
   return (
-    <div className="space-y-4 w-full">
-      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-4">
+    <div className="space-y-4 max-w-full">
+      {/* Controls Container - Now with max-width constraint */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-4 px-4 sm:px-6 md:px-0 max-w-[1200px] mx-auto">
         <div className="flex items-center space-x-2">
           <Switch
             id="sort-mode"
@@ -821,227 +866,258 @@ const PairsTable = () => {
             Sort by Buy Signals {sortByBuySignals && `(Active)`}
           </Label>
         </div>
-        <div className="flex items-center space-x-2">
+        
+        <div className="flex items-center space-x-2 min-w-0">
           <Input
             type="search"
             placeholder="Search tokens..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-xs"
+            className="flex-1 min-w-0 max-w-[200px]"
           />
           <Button
             variant="outline"
             size="icon"
             onClick={() => setShowSettingsModal(true)}
-            className="h-9 w-9"
+            className="h-9 w-9 flex-shrink-0"
           >
             <Settings className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Add the Settings Modal */}
+      {/* Table Container - Now with horizontal scroll */}
+      <div className="overflow-x-auto">
+        <div className="min-w-full w-max max-w-none bg-background dark:bg-gray-900 rounded-lg">
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                  <TableHead className="text-left w-[140px]">Symbol</TableHead>
+                  <TableHead className="text-right w-[80px]">Price</TableHead>
+                  {timeframes.map((tf) => (
+                    <TableHead 
+                      key={tf} 
+                      className="text-center text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50 w-[140px] px-3"
+                    >
+                      {tf}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <Droppable droppableId="pairs">
+                {(provided) => (
+                  <TableBody
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                  >
+                    {sortedPairs.map((pair, index) => (
+                      <Draggable
+                        key={pair.symbol}
+                        draggableId={pair.symbol}
+                        index={index}
+                      >
+                        {(provided, snapshot) => (
+                          <TableRow
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className={cn(
+                              "border-b dark:border-gray-800 hover:bg-gray-800/30 dark:hover:bg-gray-800/70",
+                              snapshot.isDragging && "bg-gray-100 dark:bg-gray-800",
+                              "cursor-move" // Add cursor indicator
+                            )}
+                          >
+                            <TableCell className="w-[140px]">
+                              <div className="flex items-center gap-2">
+                                {pair.symbol}
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                      "icon-button h-7 w-7",
+                                      notificationSettings[pair.symbol]
+                                        ? "text-amber-500 active-icon" 
+                                        : "text-gray-400 hover:text-amber-400"
+                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleAlert(pair.symbol);
+                                    }}
+                                  >
+                                    <Bell
+                                      className={cn(
+                                        "bell-icon h-4 w-4",
+                                        notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                                      )}
+                                    />
+                                  </Button>
+                                  {/* Add the test button here */}
+                                  {/* <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={testBellSound}
+                                    className="h-7 w-7"
+                                  >
+                                    Test
+                                  </Button> */}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                      "icon-button h-7 w-7",
+                                      pair.pinned 
+                                        ? "text-blue-500 active-icon" 
+                                        : "text-gray-400 hover:text-blue-400"
+                                    )}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePin(pair.symbol);
+                                    }}
+                                  >
+                                    <Pin
+                                      className={cn(
+                                        "pin-icon h-4 w-4",
+                                        pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                                      )}
+                                    />
+                                  </Button>
+                                  {sortByBuySignals && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {countBuySignals(pair)} buys
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              {pair.price?.toFixed(2)}
+                            </TableCell>
+                            {timeframes.map((tf) => (
+                              <TableCell 
+                                key={tf} 
+                                className="text-center relative w-[140px] px-3"
+                              >
+                                {renderIndicators(pair, tf)}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </TableBody>
+                )}
+              </Droppable>
+            </Table>
+          </DragDropContext>
+        </div>
+      </div>
+
+      {/* Add this Dialog component at the end, before the closing div */}
       <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>WaveTrend Settings</DialogTitle>
             <DialogDescription>
-              Customize the thresholds for WaveTrend signals
+              Adjust the thresholds for WaveTrend signals.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.currentTarget);
-            const newSettings = {
-              buyThreshold: Number(formData.get('buyThreshold')),
-              sellThreshold: Number(formData.get('sellThreshold')),
-              extremeBuyThreshold: Number(formData.get('extremeBuyThreshold')),
-              extremeSellThreshold: Number(formData.get('extremeSellThreshold'))
-            };
-            saveSettings(newSettings);
-          }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="buyThreshold" className="text-right">
-                  Buy Signal
-                </Label>
-                <Input
-                  id="buyThreshold"
-                  name="buyThreshold"
-                  type="number"
-                  defaultValue={settings.buyThreshold}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="sellThreshold" className="text-right">
-                  Sell Signal
-                </Label>
-                <Input
-                  id="sellThreshold"
-                  name="sellThreshold"
-                  type="number"
-                  defaultValue={settings.sellThreshold}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="extremeBuyThreshold" className="text-right">
-                  Extreme Buy
-                </Label>
-                <Input
-                  id="extremeBuyThreshold"
-                  name="extremeBuyThreshold"
-                  type="number"
-                  defaultValue={settings.extremeBuyThreshold}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="extremeSellThreshold" className="text-right">
-                  Extreme Sell
-                </Label>
-                <Input
-                  id="extremeSellThreshold"
-                  name="extremeSellThreshold"
-                  type="number"
-                  defaultValue={settings.extremeSellThreshold}
-                  className="col-span-3"
-                />
-              </div>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="buyThreshold" className="text-right">
+                Buy Threshold
+              </Label>
+              <Input
+                id="buyThreshold"
+                type="number"
+                defaultValue={settings.buyThreshold}
+                className="col-span-3"
+                onChange={(e) => {
+                  const newSettings = {
+                    ...settings,
+                    buyThreshold: Number(e.target.value)
+                  };
+                  setSettings(newSettings);
+                }}
+              />
             </div>
-            <DialogFooter>
-              <Button type="submit">Save changes</Button>
-            </DialogFooter>
-          </form>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="sellThreshold" className="text-right">
+                Sell Threshold
+              </Label>
+              <Input
+                id="sellThreshold"
+                type="number"
+                defaultValue={settings.sellThreshold}
+                className="col-span-3"
+                onChange={(e) => {
+                  const newSettings = {
+                    ...settings,
+                    sellThreshold: Number(e.target.value)
+                  };
+                  setSettings(newSettings);
+                }}
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="extremeBuyThreshold" className="text-right">
+                Extreme Buy
+              </Label>
+              <Input
+                id="extremeBuyThreshold"
+                type="number"
+                defaultValue={settings.extremeBuyThreshold}
+                className="col-span-3"
+                onChange={(e) => {
+                  const newSettings = {
+                    ...settings,
+                    extremeBuyThreshold: Number(e.target.value)
+                  };
+                  setSettings(newSettings);
+                }}
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="extremeSellThreshold" className="text-right">
+                Extreme Sell
+              </Label>
+              <Input
+                id="extremeSellThreshold"
+                type="number"
+                defaultValue={settings.extremeSellThreshold}
+                className="col-span-3"
+                onChange={(e) => {
+                  const newSettings = {
+                    ...settings,
+                    extremeSellThreshold: Number(e.target.value)
+                  };
+                  setSettings(newSettings);
+                }}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSettingsModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => saveSettings(settings)}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <div className="relative overflow-x-auto bg-background dark:bg-gray-900 rounded-lg w-full">
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <TableHead className="text-left w-[140px]">Symbol</TableHead>
-                <TableHead className="text-right w-[80px]">Price</TableHead>
-                {timeframes.map((tf) => (
-                  <TableHead 
-                    key={tf} 
-                    className="text-center text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50 w-[140px] px-3"
-                  >
-                    {tf}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <Droppable droppableId="pairs">
-              {(provided) => (
-                <TableBody
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                >
-                  {sortedPairs.map((pair, index) => (
-                    <Draggable
-                      key={pair.symbol}
-                      draggableId={pair.symbol}
-                      index={index}
-                    >
-                      {(provided, snapshot) => (
-                        <TableRow
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className={cn(
-                            "border-b dark:border-gray-800 hover:bg-gray-800/30 dark:hover:bg-gray-800/70",
-                            snapshot.isDragging && "bg-gray-100 dark:bg-gray-800",
-                            "cursor-move" // Add cursor indicator
-                          )}
-                        >
-                          <TableCell className="w-[140px]">
-                            <div className="flex items-center gap-2">
-                              {pair.symbol}
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    "icon-button h-7 w-7",
-                                    notificationSettings[pair.symbol]
-                                      ? "text-amber-500 active-icon" 
-                                      : "text-gray-400 hover:text-amber-400"
-                                  )}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleAlert(pair.symbol);
-                                  }}
-                                >
-                                  <Bell
-                                    className={cn(
-                                      "bell-icon h-4 w-4",
-                                      notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
-                                    )}
-                                  />
-                                </Button>
-                                {/* Add the test button here */}
-                                {/* <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={testBellSound}
-                                  className="h-7 w-7"
-                                >
-                                  Test
-                                </Button> */}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    "icon-button h-7 w-7",
-                                    pair.pinned 
-                                      ? "text-blue-500 active-icon" 
-                                      : "text-gray-400 hover:text-blue-400"
-                                  )}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    togglePin(pair.symbol);
-                                  }}
-                                >
-                                  <Pin
-                                    className={cn(
-                                      "pin-icon h-4 w-4",
-                                      pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
-                                    )}
-                                  />
-                                </Button>
-                                {sortByBuySignals && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {countBuySignals(pair)} buys
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right pr-6">
-                            {pair.price?.toFixed(2)}
-                          </TableCell>
-                          {timeframes.map((tf) => (
-                            <TableCell 
-                              key={tf} 
-                              className="text-center relative w-[140px] px-3"
-                            >
-                              {renderIndicators(pair, tf)}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </TableBody>
-              )}
-            </Droppable>
-          </Table>
-        </DragDropContext>
-      </div>
     </div>
   )
 }

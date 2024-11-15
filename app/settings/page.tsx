@@ -26,6 +26,11 @@ import {
 } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Bell } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useRouter } from 'next/navigation'
+import { LogOut } from "lucide-react"
 
 const alertTypes = [
   {
@@ -48,9 +53,6 @@ const alertTypes = [
 const formSchema = z.object({
   email: z.string().email(),
   notifications: z.boolean(),
-  phone_number: z.string().regex(/^\+?[1-9]\d{1,14}$/, {
-    message: "Please enter a valid phone number",
-  }),
   alerts_enabled: z.boolean(),
   alert_types: z.array(z.string()).refine((value) => value.length > 0, {
     message: "You must select at least one alert type.",
@@ -59,16 +61,26 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
+const NOTIFICATION_SETTINGS_KEY = 'pairNotificationSettings'
+
+interface NotificationSettings {
+  [symbol: string]: boolean;
+}
+
 const SettingsPage = () => {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({})
+  const [pairs, setPairs] = useState<string[]>([])
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const supabase = createClientComponentClient()
+  const router = useRouter()
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
       notifications: true,
-      phone_number: "",
       alerts_enabled: false,
       alert_types: ["extreme_signals"],
     },
@@ -84,7 +96,6 @@ const SettingsPage = () => {
         if (data && !data.error) {
           form.reset({
             ...form.getValues(),
-            phone_number: data.phone_number || '',
             alerts_enabled: data.enabled || false,
             alert_types: data.alert_types || ['extreme_signals'],
           })
@@ -99,6 +110,49 @@ const SettingsPage = () => {
     fetchSettings()
   }, [form])
 
+  // Add new useEffect for notification settings
+  useEffect(() => {
+    // Load notification settings from localStorage
+    const savedSettings = localStorage.getItem(NOTIFICATION_SETTINGS_KEY)
+    if (savedSettings) {
+      setNotificationSettings(JSON.parse(savedSettings))
+    }
+
+    // Check if notifications are enabled
+    if ('Notification' in window) {
+      setNotificationsEnabled(Notification.permission === 'granted')
+    }
+
+    // Fetch pairs from Supabase
+    const fetchPairs = async () => {
+      const { data: pairsData } = await supabase
+        .from('pairs')
+        .select('symbol')
+      
+      if (pairsData) {
+        setPairs(pairsData.map(p => p.symbol))
+      }
+    }
+
+    fetchPairs()
+  }, [])
+
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      setNotificationsEnabled(permission === 'granted')
+    }
+  }
+
+  const handleToggleNotification = (symbol: string) => {
+    const newSettings = {
+      ...notificationSettings,
+      [symbol]: !notificationSettings[symbol]
+    }
+    setNotificationSettings(newSettings)
+    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(newSettings))
+  }
+
   async function onSubmit(values: FormValues) {
     try {
       setIsLoading(true)
@@ -110,7 +164,6 @@ const SettingsPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone_number: values.phone_number,
           alert_types: values.alert_types,
           enabled: values.alerts_enabled,
         }),
@@ -134,6 +187,12 @@ const SettingsPage = () => {
     }
   }
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -144,7 +203,9 @@ const SettingsPage = () => {
 
   return (
     <div className="p-6 sm:p-10 container py-10">
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Settings</h1>
+      </div>
 
       <div className="max-w-2xl space-y-8">
         <Form {...form}>
@@ -159,32 +220,15 @@ const SettingsPage = () => {
               <CardContent className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="phone_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1234567890" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Your phone number for receiving alerts (include country code)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name="alerts_enabled"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
                         <FormLabel className="text-base">
-                          Phone Alerts
+                          Alerts
                         </FormLabel>
                         <FormDescription>
-                          Receive trading alerts on your phone
+                          Receive trading alerts
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -253,15 +297,65 @@ const SettingsPage = () => {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Browser Push Notifications
+                </CardTitle>
+                <CardDescription>
+                  Configure which trading pairs you want to receive browser notifications for.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!notificationsEnabled && (
+                  <div className="mb-4 p-4 bg-yellow-500/10 rounded-lg">
+                    <p className="text-yellow-500 text-sm">
+                      Browser notifications are not enabled. 
+                      <button 
+                        onClick={requestNotificationPermission}
+                        className="ml-2 underline hover:text-yellow-400"
+                      >
+                        Enable Notifications
+                      </button>
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {pairs.map((symbol) => (
+                    <div key={symbol} className="flex items-center justify-between">
+                      <Label htmlFor={`notify-${symbol}`} className="flex items-center gap-2">
+                        {symbol}
+                      </Label>
+                      <Switch
+                        id={`notify-${symbol}`}
+                        checked={notificationSettings[symbol] || false}
+                        onCheckedChange={() => handleToggleNotification(symbol)}
+                        disabled={!notificationsEnabled}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
             <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save changes
             </Button>
           </form>
         </Form>
+        <Button
+          variant="outline"
+          onClick={handleSignOut}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
       </div>
     </div>
   )
 }
-
 export default SettingsPage

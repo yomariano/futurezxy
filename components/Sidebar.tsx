@@ -91,9 +91,9 @@ export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
           <LogOut className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
           {!isCollapsed && "Sign Out"}
         </button>
-        <div className="p-4">
+        {/* <div className="p-4">
           <ChatBot />
-        </div>
+        </div> */}
       </div>
     </div>
   )
