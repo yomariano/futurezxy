@@ -983,14 +983,14 @@ const PairsTable = () => {
                                   />
                                 </Button>
                                 {/* Add the test button here */}
-                                <Button
+                                {/* <Button
                                   variant="outline"
                                   size="icon"
                                   onClick={testBellSound}
                                   className="h-7 w-7"
                                 >
                                   Test
-                                </Button>
+                                </Button> */}
                                 <Button
                                   variant="ghost"
                                   size="icon"

@@ -20,10 +20,7 @@ export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   return (
-    <div className={cn(
-      "relative h-full bg-background border-r transition-all duration-300 flex flex-col",
-      !isMobile && (isCollapsed ? "w-16" : "w-64")
-    )}>
+    <div className={cn("fixed left-0 top-0 bottom-0 w-64 border-r hidden md:block", { "w-16": isCollapsed })}>
       <div className="sticky top-0 z-20 h-16 flex items-center border-b bg-background">
         <div className={cn(
           "flex items-center w-full",

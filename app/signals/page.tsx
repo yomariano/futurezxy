@@ -8,7 +8,7 @@ export default function SignalsPage() {
       <div className="p-2 sm:p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-foreground dark:text-white">Trading Pairs</h1>
-          <AddPairDialog />
+          {/* <AddPairDialog /> */}
         </div>
         <PairsTable />
       </div>

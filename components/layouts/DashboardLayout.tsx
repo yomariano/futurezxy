@@ -23,7 +23,7 @@ export default function DashboardLayout({
       {/* Mobile Layout */}
       <div className="flex flex-1 flex-col md:pl-0">
         {/* Mobile Menu */}
-        <div className="block md:hidden">
+        {/* <div className="block md:hidden">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" className="absolute top-4 right-4 z-50 p-0 w-12">
@@ -34,7 +34,7 @@ export default function DashboardLayout({
               <Sidebar isMobile={true} />
             </SheetContent>
           </Sheet>
-        </div>
+        </div> */}
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">

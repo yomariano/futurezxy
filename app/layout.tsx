@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { ThemeProvider } from "next-themes"
 import { cn } from "@/lib/utils"
 import DashboardLayout from "@/components/layouts/DashboardLayout"
+import MobileNav from "@/components/MobileNav"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,7 +30,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <DashboardLayout>
-            {children}
+            <main className="md:pl-64 pb-16 md:pb-0">
+              {children}
+            </main>
+            <MobileNav />
           </DashboardLayout>
         </ThemeProvider>
       </body>
