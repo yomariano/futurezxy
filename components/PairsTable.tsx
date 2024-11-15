@@ -273,10 +273,22 @@ const showNotification = (symbol: string, message: string) => {
       
       if (notificationSettings[symbol]) {
         try {
-          new Notification(`${symbol} Alert`, {
+          const notification = new Notification(`${symbol} Trading Alert 📈`, {
             body: message,
-            icon: '/favicon.ico'
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: `trading-${symbol}`,
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [200, 100, 200],
+            silent: false,
           });
+
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+
           console.log('Notification sent successfully');
         } catch (error) {
           console.error('Error sending notification:', error);
@@ -286,9 +298,50 @@ const showNotification = (symbol: string, message: string) => {
       Notification.requestPermission().then(permission => {
         console.log('Permission requested:', permission);
         if (permission === 'granted') {
-          showNotification(symbol, message); // Try again if permission was just granted
+          showNotification(symbol, message);
         }
       });
+    }
+  }
+};
+
+// Update the testNotification function
+const testNotification = (playBellSound?: () => void) => {
+  if ('Notification' in window) {
+    if (Notification.permission === 'granted') {
+      try {
+        // Create notification with more options
+        const notification = new Notification('Trading Alert 📈', {
+          body: 'This is a test trading notification',
+          icon: '/favicon.ico', // Make sure this path is correct
+          badge: '/favicon.ico',
+          tag: 'test-notification',
+          renotify: true, // Always show new notification
+          requireInteraction: true, // Notification persists until user interacts
+          vibrate: [200, 100, 200], // Vibration pattern for mobile devices
+          silent: false, // Allow system sound
+        });
+
+        // Add click handler
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+
+        // Play custom sound
+        playBellSound?.();
+      } catch (error) {
+        console.error('Error sending test notification:', error);
+      }
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          testNotification(playBellSound);
+        }
+      });
+    } else {
+      // If notifications are denied, show a message to the user
+      alert('Please enable notifications in your browser settings to receive trading alerts.');
     }
   }
 };
@@ -366,8 +419,18 @@ const PairsTable = () => {
 
   // Add this useEffect to request notification permission on component mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if ('Notification' in window) {
+      // Request permission on component mount
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          console.log('Notification permission status:', permission);
+        });
+      }
+      
+      // Log current permission status
+      console.log('Current notification permission:', Notification.permission);
+    } else {
+      console.log('Notifications not supported in this browser');
     }
   }, []);
 
@@ -1025,6 +1088,25 @@ const PairsTable = () => {
             </DialogDescription>
           </DialogHeader>
           
+          {/* Add this section before the grid of settings */}
+          <div className="flex items-center justify-between py-2 border-b">
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium">Notifications</h4>
+              <p className="text-sm text-muted-foreground">
+                Test your notification settings
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => testNotification(playBell)}
+              className="flex items-center gap-2"
+            >
+              <Bell className="h-4 w-4" />
+              Test Notifications
+            </Button>
+          </div>
+
+          {/* Existing settings grid */}
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="buyThreshold" className="text-right">

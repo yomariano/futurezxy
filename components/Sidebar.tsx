@@ -1,6 +1,6 @@
 "use client"
 
-import { LineChart, Settings, PanelLeftClose, PanelLeft, BarChart2Icon, SettingsIcon, CreditCardIcon, LogOut } from "lucide-react"
+import { LineChart, Settings, PanelLeftClose, PanelLeft, BarChart2Icon, SettingsIcon, CreditCardIcon, LogOut, Lock } from "lucide-react"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import Link from "next/link"
@@ -9,12 +9,25 @@ import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { ChatBot } from "@/components/ChatBot"
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 
 const sidebarItems = [
-  { name: "Signals", href: "/signals", icon: LineChart },
-  { name: "Analytics", href: "/analytics", icon: BarChart2Icon },
-  { name: "Settings", href: "/settings", icon: SettingsIcon },
-  { name: "Billing", href: "/billing", icon: CreditCardIcon },
+  { name: "Signals", href: "/signals", icon: LineChart, enabled: true },
+  { 
+    name: "Analytics", 
+    href: "/analytics", 
+    icon: BarChart2Icon, 
+    enabled: false,
+    disabledMessage: "Analytics coming soon" 
+  },
+  { name: "Settings", href: "/settings", icon: SettingsIcon, enabled: true },
+  { 
+    name: "Billing", 
+    href: "/billing", 
+    icon: CreditCardIcon, 
+    enabled: false,
+    disabledMessage: "Billing coming soon" 
+  },
 ]
 
 export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
@@ -58,26 +71,51 @@ export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
         "relative space-y-1 py-4 flex-1",
         !isMobile && (isCollapsed ? "px-2" : "px-3")
       )}>
-        {sidebarItems.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-secondary text-secondary-foreground"
-                  : "hover:bg-secondary/50",
-                isCollapsed && "justify-center"
-              )}
-              title={isCollapsed ? item.name : undefined}
-            >
-              <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
-              {!isCollapsed && item.name}
-            </Link>
-          )
-        })}
+        <TooltipProvider>
+          {sidebarItems.map((item) => {
+            const isActive = pathname === item.href
+            const itemContent = (
+              <div
+                className={cn(
+                  "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-secondary text-secondary-foreground"
+                    : "hover:bg-secondary/50",
+                  !item.enabled && "opacity-50 cursor-not-allowed",
+                  isCollapsed && "justify-center"
+                )}
+                title={isCollapsed ? item.name : undefined}
+              >
+                <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                {!isCollapsed && (
+                  <>
+                    {item.name}
+                    {!item.enabled && <Lock className="h-3 w-3 ml-auto" />}
+                  </>
+                )}
+              </div>
+            )
+
+            return (
+              <Tooltip key={item.name} delayDuration={300}>
+                <TooltipTrigger asChild>
+                  {item.enabled ? (
+                    <Link href={item.href}>
+                      {itemContent}
+                    </Link>
+                  ) : (
+                    itemContent
+                  )}
+                </TooltipTrigger>
+                {!item.enabled && (
+                  <TooltipContent>
+                    <p>{item.disabledMessage}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            )
+          })}
+        </TooltipProvider>
       </nav>
       <div className="mt-auto border-t">
         <button
