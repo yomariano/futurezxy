@@ -278,9 +278,7 @@ const showNotification = (symbol: string, message: string) => {
             icon: '/favicon.ico',
             badge: '/favicon.ico',
             tag: `trading-${symbol}`,
-            renotify: true,
             requireInteraction: true,
-            vibrate: [200, 100, 200],
             silent: false,
           });
 
@@ -310,15 +308,13 @@ const testNotification = (playBellSound?: () => void) => {
   if ('Notification' in window) {
     if (Notification.permission === 'granted') {
       try {
-        // Create notification with more options
+        // Create notification with supported options
         const notification = new Notification('Trading Alert 📈', {
           body: 'This is a test trading notification',
-          icon: '/favicon.ico', // Make sure this path is correct
+          icon: '/favicon.ico',
           badge: '/favicon.ico',
           tag: 'test-notification',
-          renotify: true, // Always show new notification
           requireInteraction: true, // Notification persists until user interacts
-          vibrate: [200, 100, 200], // Vibration pattern for mobile devices
           silent: false, // Allow system sound
         });
 
@@ -1098,7 +1094,7 @@ const PairsTable = () => {
             </div>
             <Button
               variant="outline"
-              onClick={() => testNotification(playBell)}
+              onClick={() => testNotification(playBell || (() => {}))}
               className="flex items-center gap-2"
             >
               <Bell className="h-4 w-4" />
