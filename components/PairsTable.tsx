@@ -72,7 +72,7 @@ interface TradingPair {
   }>;
   pinned?: boolean;
   alerts?: boolean;
-  currentPrice?: number;
+  price?: number;
 }
 
 // Modify calculateSignal to accept settings as a parameter
@@ -507,13 +507,7 @@ const PairsTable = () => {
         };
             
         testWs.onerror = (error) => {
-            console.error('❌ WebSocket error occurred:', {
-                error,
-                timestamp: new Date().toISOString(),
-                readyState: testWs.readyState,
-                // Log the WebSocket ready state as a string for better debugging
-                readyStateString: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][testWs.readyState]
-            });
+            console.error('���� Failed to setup WebSocket:', error);
         };
             
         testWs.onmessage = (event) => {
@@ -794,9 +788,9 @@ const PairsTable = () => {
   };
 
   return (
-    <div className="space-y-4 max-w-full">
-      {/* Controls Container - Now with max-width constraint */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-4 px-4 sm:px-6 md:px-0 max-w-[1200px] mx-auto">
+    <div className="space-y-4">
+      {/* Controls Container */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-4 px-4 sm:px-6 md:px-0">
         <div className="flex items-center space-x-2">
           <Switch
             id="sort-mode"
@@ -827,9 +821,9 @@ const PairsTable = () => {
         </div>
       </div>
 
-      {/* Table Container - Now with horizontal scroll */}
-      <div className="overflow-x-auto">
-        <div className="min-w-full w-max max-w-none bg-background dark:bg-gray-900 rounded-lg">
+      {/* Simplified table container with forced scrolling */}
+      <div className="w-screen md:w-full overflow-x-scroll md:overflow-x-auto">
+        <div style={{ minWidth: `${timeframes.length * 140 + 300}px` }}>
           <DragDropContext onDragEnd={onDragEnd}>
             <Table>
               <TableHeader>
@@ -933,7 +927,7 @@ const PairsTable = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-right pr-6">
-                              {pair.currentPrice?.toFixed(2)}
+                              {pair.price?.toFixed(2)}
                             </TableCell>
                             {timeframes.map((tf) => (
                               <TableCell 
