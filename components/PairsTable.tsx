@@ -51,48 +51,26 @@ interface ColorChangeTimestamp {
   color: 'red' | 'green';
 }
 
-// Add new interface for the WebSocket message
+// Simplify the message interface to match the actual data
 interface WaveTrendMessage {
-  type: string;
   symbol: string;
   timeframe: string;
   timestamp: string;
   wt1: number;
   wt2: number;
   rsi: number;
-  sma50: number;
-  sma200: number;
 }
 
+// Simplify the TradingPair interface
 interface TradingPair {
   symbol: string;
-  price?: number;
-  alerts?: boolean;
-  pinned?: boolean;
   signals: Record<Timeframe, SignalType>;
   indicators: Record<Timeframe, {
     wt1: number;
     wt2: number;
-    sma50: number;
-    sma200: number;
     rsi: number;
-    colorChanges?: {
-      wt1?: ColorChangeTimestamp;
-      wt2?: ColorChangeTimestamp;
-    };
-    signals?: {
-      bearish_divergence: boolean;
-      bullish_divergence: boolean;
-      hidden_bearish_divergence: boolean;
-      hidden_bullish_divergence: boolean;
-      overbought: boolean;
-      oversold: boolean;
-      price_above_sma50: boolean;
-      price_above_sma200: boolean;
-      sma50_above_sma200: boolean;
-    };
   }>;
-  order?: number;
+  pinned?: boolean;
 }
 
 // Modify calculateSignal to accept settings as a parameter
@@ -150,32 +128,6 @@ const timeframeToMinutes = (timeframe: string): number => {
     default: return 0;
   }
 };
-
-interface IndicatorMessage {
-  type: 'indicators';
-  symbol: string;
-  timeframe: string;
-  timestamp: string;
-  price: number;
-  rsi: number;
-  wt1: number;
-  wt2: number;
-  sma50: number;
-  sma200: number;
-  signals: {
-    bearish_divergence: boolean;
-    bullish_divergence: boolean;
-    cross_over: boolean;
-    cross_under: boolean;
-    hidden_bearish_divergence: boolean;
-    hidden_bullish_divergence: boolean;
-    overbought: boolean;
-    oversold: boolean;
-    price_above_sma50: boolean;
-    price_above_sma200: boolean;
-    sma50_above_sma200: boolean;
-  };
-}
 
 // Add this CSS animation at the top of your file or in your global CSS
 const blinkingAnimation = `
@@ -430,14 +382,14 @@ const PairsTable = () => {
     }
   }, []);
 
-  const handleIndicatorMessage = (data: IndicatorMessage) => {
+  // Update the handleIndicatorMessage function
+  const handleIndicatorMessage = (data: WaveTrendMessage) => {
     console.log('Received indicator message:', data);
     console.log('Current settings:', settings);
     
     const signal = calculateSignal(data.wt1, settings);
     console.log('Calculated signal:', signal);
     
-    // Update timeframes if we receive a new one
     setTimeframes(current => {
       if (!current.includes(data.timeframe as Timeframe)) {
         return [...current, data.timeframe as Timeframe]
@@ -447,36 +399,13 @@ const PairsTable = () => {
     });
     
     setPairs(currentPairs => {
-      // Find existing pair
       const existingPair = currentPairs.find(p => p.symbol === data.symbol);
-      const previousSignal = existingPair?.signals[data.timeframe as Timeframe];
       
-      // Check if this is a new buy signal
-      const isNewBuySignal = (
-        signal === 'buy' || 
-        signal === 'extreme-buy' || 
-        signal === 'near-buy'
-      ) && previousSignal !== signal;
-
-      // If it's a new buy signal on 1m timeframe, trigger notification
-      if (data.timeframe === '1m' && 
-          isNewBuySignal && 
-          notificationSettings[data.symbol]) {
-        console.log('Triggering notification for:', data.symbol);
-        playBell?.();
-        showNotification(
-          data.symbol,
-          `New buy signal detected (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`
-        );
-      }
-
-      // Update pair data
       if (existingPair) {
         return currentPairs.map(pair => 
           pair.symbol === data.symbol
             ? {
                 ...pair,
-                price: data.price,
                 signals: {
                   ...pair.signals,
                   [data.timeframe]: signal
@@ -487,77 +416,38 @@ const PairsTable = () => {
                     wt1: data.wt1,
                     wt2: data.wt2,
                     rsi: data.rsi,
-                    sma50: data.sma50,
-                    sma200: data.sma200,
-                    signals: data.signals
                   }
                 }
               }
             : pair
         );
       } else {
-        // Create new pair
         const newPair: TradingPair = {
           symbol: data.symbol,
-          price: data.price,
           signals: { [data.timeframe]: signal } as Record<Timeframe, SignalType>,
           indicators: {
             [data.timeframe]: {
               wt1: data.wt1,
               wt2: data.wt2,
               rsi: data.rsi,
-              sma50: data.sma50,
-              sma200: data.sma200
             }
           } as Record<Timeframe, {
             wt1: number;
             wt2: number;
             rsi: number;
-            sma50: number;
-            sma200: number;
           }>
         };
         return [...currentPairs, newPair];
       }
     });
-
-    // Add debug logging
-    if (data.signals.cross_over || data.signals.cross_under) {
-      console.log('Cross signal detected:', {
-        symbol: data.symbol,
-        timeframe: data.timeframe,
-        crossOver: data.signals.cross_over,
-        crossUnder: data.signals.cross_under
-      });
-    }
-
-    // Handle cross signals
-    if (data.signals.cross_over || data.signals.cross_under) {
-      const newSignal: CrossSignals = {
-        symbol: data.symbol,
-        timeframe: data.timeframe as Timeframe,
-        timestamp: Date.now(),
-        type: data.signals.cross_over ? 'cross_over' : 'cross_under'
-      };
-      
-      console.log('Adding new cross signal:', newSignal);
-      
-      setCrossSignals(prev => {
-        // Remove any existing signals for this symbol/timeframe combination
-        const filtered = prev.filter(s => 
-          !(s.symbol === data.symbol && s.timeframe === data.timeframe)
-        );
-        return [...filtered, newSignal];
-      });
-    }
   };
 
   const connectWebSocket = () => {
     setIsLoading(true);
     
     try {
-        const url = 'ws://localhost:8765'
-        //const url = 'wss://your-trading-bot.fly.dev/ws'
+        //const url = 'ws://localhost:8765'
+        const url = process.env.NEXT_PUBLIC_WSS_URL;//'wss://your-trading-bot.fly.dev/ws'
 
         console.log('🔄 Attempting WebSocket connection to:', url);
         
@@ -565,6 +455,12 @@ const PairsTable = () => {
         if (ws) {
             console.log('🔌 Closing existing connection');
             ws.close();
+        }
+
+        if (!url) {
+            console.error('❌ WebSocket URL is undefined');
+            setIsLoading(false);
+            return;
         }
 
         const testWs = new WebSocket(url);
@@ -623,7 +519,7 @@ const PairsTable = () => {
             console.log('📨 Received message:', data);
 
             if (data.type === 'indicators') {
-              handleIndicatorMessage(data as IndicatorMessage);
+              handleIndicatorMessage(data as WaveTrendMessage);
             }
         };
 
@@ -800,6 +696,7 @@ const PairsTable = () => {
     localStorage.setItem('sortByBuySignals', JSON.stringify(newValue));
   };
 
+  // Update the renderIndicators function
   const renderIndicators = useCallback((pair: TradingPair, timeframe: Timeframe) => {
     const indicator = pair.indicators[timeframe];
     
@@ -811,30 +708,27 @@ const PairsTable = () => {
       );
     }
 
-    const getIndicatorColor = (value: number, type: 'wt' | 'rsi' | 'sma') => {
-      if (type === 'wt') {
-        if (value >= settings.extremeSellThreshold) return "text-red-500";
-        if (value <= settings.extremeBuyThreshold) return "text-green-500";
-        if (value >= settings.sellThreshold) return "text-red-400";
-        if (value <= settings.buyThreshold) return "text-green-400";
-        return "text-blue-400";
-      } else if (type === 'rsi') {
-        if (value >= RSI_OVERBOUGHT) return "text-red-500";
-        if (value <= RSI_OVERSOLD) return "text-green-500";
-        return "text-blue-400";
-      } else { // sma
-        return indicator.signals?.price_above_sma50 ? "text-green-400" : "text-red-400";
-      }
+    const getIndicatorColor = (value: number) => {
+      if (value >= settings.extremeSellThreshold) return "text-red-500";
+      if (value <= settings.extremeBuyThreshold) return "text-green-500";
+      if (value >= settings.sellThreshold) return "text-red-400";
+      if (value <= settings.buyThreshold) return "text-green-400";
+      return "text-blue-400";
+    };
+
+    const getRsiColor = (value: number) => {
+      if (value >= RSI_OVERBOUGHT) return "text-red-500";
+      if (value <= RSI_OVERSOLD) return "text-green-500";
+      return "text-blue-400";
     };
 
     return (
       <div className="flex flex-col gap-0.5 p-0.5">
-        {/* WaveTrend 1 and 2 */}
         <div className="flex flex-row items-center justify-center gap-1">
           <div className={cn(
             "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
             "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.wt1, 'wt')
+            getIndicatorColor(indicator.wt1)
           )}>
             <Waves className="w-3 h-3" />
             <span className="text-xs font-medium">
@@ -844,35 +738,21 @@ const PairsTable = () => {
           <div className={cn(
             "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
             "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.wt2, 'wt')
+            getIndicatorColor(indicator.wt2)
           )}>
             <Waves className="w-3 h-3" />
             <span className="text-xs font-medium">
               {indicator.wt2?.toFixed(1)}
             </span>
           </div>
-        </div>
-
-        {/* RSI and SMA50 */}
-        <div className="flex flex-row items-center justify-center gap-1">
           <div className={cn(
             "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
             "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.rsi, 'rsi')
+            getRsiColor(indicator.rsi)
           )}>
             <LineChart className="w-3 h-3" />
             <span className="text-xs font-medium">
               {indicator.rsi?.toFixed(1)}
-            </span>
-          </div>
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.sma50, 'sma')
-          )}>
-            <BarChart2 className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.sma50?.toFixed(1)}
             </span>
           </div>
         </div>
@@ -1051,11 +931,11 @@ const PairsTable = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-right pr-6">
-                              {pair.price?.toFixed(2)}
+                              {pair.currentPrice?.toFixed(2)}
                             </TableCell>
                             {timeframes.map((tf) => (
                               <TableCell 
-                                key={tf} 
+                                key={tf}
                                 className="text-center relative w-[140px] px-3"
                               >
                                 {renderIndicators(pair, tf)}
