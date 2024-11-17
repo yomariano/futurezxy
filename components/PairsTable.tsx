@@ -59,6 +59,7 @@ interface WaveTrendMessage {
   wt1: number;
   wt2: number;
   rsi: number;
+  price: number;
 }
 
 // Simplify the TradingPair interface
@@ -408,6 +409,7 @@ const PairsTable = () => {
           pair.symbol === data.symbol
             ? {
                 ...pair,
+                price: data.price,
                 signals: {
                   ...pair.signals,
                   [data.timeframe]: signal
@@ -426,6 +428,7 @@ const PairsTable = () => {
       } else {
         const newPair: TradingPair = {
           symbol: data.symbol,
+          price: data.price,
           signals: { [data.timeframe]: signal } as Record<Timeframe, SignalType>,
           indicators: {
             [data.timeframe]: {
@@ -507,7 +510,7 @@ const PairsTable = () => {
         };
             
         testWs.onerror = (error) => {
-            console.error('���� Failed to setup WebSocket:', error);
+            console.error(' Failed to setup WebSocket:', error);
         };
             
         testWs.onmessage = (event) => {
@@ -927,7 +930,7 @@ const PairsTable = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-right pr-6">
-                              {pair.price?.toFixed(2)}
+                              {pair.price?.toFixed(4)}
                             </TableCell>
                             {timeframes.map((tf) => (
                               <TableCell 
