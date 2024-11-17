@@ -71,6 +71,8 @@ interface TradingPair {
     rsi: number;
   }>;
   pinned?: boolean;
+  alerts?: boolean;
+  currentPrice?: number;
 }
 
 // Modify calculateSignal to accept settings as a parameter
