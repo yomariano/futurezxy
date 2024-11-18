@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react'
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -297,6 +297,125 @@ const testNotification = (playBellSound?: () => void) => {
   }
 };
 
+// 1. Add memoization for expensive renders
+const MemoizedIndicators = memo(({ pair, timeframe, settings }: {
+  pair: TradingPair;
+  timeframe: Timeframe;
+  settings: WaveTrendSettings;
+}) => {
+  const indicator = pair.indicators[timeframe];
+  
+  if (!indicator) {
+    return (
+      <div className="text-muted-foreground">
+        <Activity className="w-4 h-4 animate-pulse" />
+      </div>
+    );
+  }
+
+  const getIndicatorColor = (value: number) => {
+    if (value >= settings.extremeSellThreshold) return "text-red-500";
+    if (value <= settings.extremeBuyThreshold) return "text-green-500";
+    if (value >= settings.sellThreshold) return "text-red-400";
+    if (value <= settings.buyThreshold) return "text-green-400";
+    return "text-blue-400";
+  };
+
+  const getRsiColor = (value: number) => {
+    if (value >= RSI_OVERBOUGHT) return "text-red-500";
+    if (value <= RSI_OVERSOLD) return "text-green-500";
+    return "text-blue-400";
+  };
+
+  return (
+    <div className="flex flex-col gap-0.5 p-0.5">
+      <div className="flex flex-row items-center justify-center gap-1">
+        <div className={cn(
+          "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+          "bg-background/50 hover:bg-background/80 transition-colors",
+          getIndicatorColor(indicator.wt1)
+        )}>
+          <Waves className="w-3 h-3" />
+          <span className="text-xs font-medium">
+            {indicator.wt1?.toFixed(1)}
+          </span>
+        </div>
+        <div className={cn(
+          "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+          "bg-background/50 hover:bg-background/80 transition-colors",
+          getIndicatorColor(indicator.wt2)
+        )}>
+          <Waves className="w-3 h-3" />
+          <span className="text-xs font-medium">
+            {indicator.wt2?.toFixed(1)}
+          </span>
+        </div>
+        <div className={cn(
+          "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+          "bg-background/50 hover:bg-background/80 transition-colors",
+          getRsiColor(indicator.rsi)
+        )}>
+          <LineChart className="w-3 h-3" />
+          <span className="text-xs font-medium">
+            {indicator.rsi?.toFixed(1)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function
+  return (
+    prevProps.pair.indicators[prevProps.timeframe]?.wt1 === nextProps.pair.indicators[nextProps.timeframe]?.wt1 &&
+    prevProps.pair.indicators[prevProps.timeframe]?.wt2 === nextProps.pair.indicators[nextProps.timeframe]?.wt2 &&
+    prevProps.pair.indicators[prevProps.timeframe]?.rsi === nextProps.pair.indicators[nextProps.timeframe]?.rsi &&
+    prevProps.settings === nextProps.settings
+  );
+});
+
+// 2. Add memoization for sorted pairs
+const useSortedPairs = (pairs: TradingPair[], sortByBuySignals: boolean, searchQuery: string) => {
+  return useMemo(() => {
+    const filteredPairs = pairs.filter(pair =>
+      pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return sortByBuySignals 
+      ? [...filteredPairs].sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          const aCount = countBuySignals(a);
+          const bCount = countBuySignals(b);
+          return bCount - aCount;
+        })
+      : filteredPairs.sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return 0;
+        });
+  }, [pairs, sortByBuySignals, searchQuery]);
+};
+
+// Add this utility function at the top with other utilities
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  
+  return (...args: Parameters<T>) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    
+    timeout = setTimeout(() => {
+      func(...args);
+      timeout = null;
+    }, wait);
+  };
+}
+
+// 3. Modify the PairsTable component
 const PairsTable = () => {
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -670,94 +789,129 @@ const PairsTable = () => {
     });
   };
 
-  // Modify your sorting logic to account for pins
-  const sortedPairs = sortByBuySignals 
-    ? [...filteredPairs].sort((a, b) => {
-        // First sort by pinned status
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        // Then by buy signals
-        const aCount = countBuySignals(a);
-        const bCount = countBuySignals(b);
-        return bCount - aCount;
-      })
-    : filteredPairs.sort((a, b) => {
-        // Sort only by pinned status when not sorting by buy signals
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return 0;
-      });
+  // Use memoized sorted pairs
+  const sortedPairs = useSortedPairs(pairs, sortByBuySignals, searchQuery);
 
-  // Update the toggle handler
-  const handleSortToggle = () => {
-    const newValue = !sortByBuySignals;
-    setSortByBuySignals(newValue);
-    localStorage.setItem('sortByBuySignals', JSON.stringify(newValue));
+  // 4. Debounce search input
+  const debouncedSetSearchQuery = useCallback(
+    debounce((value: string) => setSearchQuery(value), 300),
+    []
+  );
+
+  // 5. Memoize handlers
+  const handleAlert = useCallback((symbol: string) => {
+    toggleAlert(symbol);
+  }, []);
+
+  const handlePin = useCallback((symbol: string) => {
+    togglePin(symbol);
+  }, []);
+
+  const handleSortToggle = (checked: boolean) => {
+    setSortByBuySignals(checked);
+    localStorage.setItem('sortByBuySignals', JSON.stringify(checked));
   };
 
-  // Update the renderIndicators function
-  const renderIndicators = useCallback((pair: TradingPair, timeframe: Timeframe) => {
-    const indicator = pair.indicators[timeframe];
-    
-    if (!indicator) {
-      return (
-        <div className="text-muted-foreground">
-          <Activity className="w-4 h-4 animate-pulse" />
-        </div>
-      );
-    }
-
-    const getIndicatorColor = (value: number) => {
-      if (value >= settings.extremeSellThreshold) return "text-red-500";
-      if (value <= settings.extremeBuyThreshold) return "text-green-500";
-      if (value >= settings.sellThreshold) return "text-red-400";
-      if (value <= settings.buyThreshold) return "text-green-400";
-      return "text-blue-400";
-    };
-
-    const getRsiColor = (value: number) => {
-      if (value >= RSI_OVERBOUGHT) return "text-red-500";
-      if (value <= RSI_OVERSOLD) return "text-green-500";
-      return "text-blue-400";
-    };
-
-    return (
-      <div className="flex flex-col gap-0.5 p-0.5">
-        <div className="flex flex-row items-center justify-center gap-1">
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.wt1)
-          )}>
-            <Waves className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.wt1?.toFixed(1)}
-            </span>
-          </div>
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.wt2)
-          )}>
-            <Waves className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.wt2?.toFixed(1)}
-            </span>
-          </div>
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getRsiColor(indicator.rsi)
-          )}>
-            <LineChart className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.rsi?.toFixed(1)}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }, [settings]);
+  // 6. Update the table row rendering
+  const renderTableRow = useCallback((pair: TradingPair, index: number) => (
+    <Draggable
+      key={pair.symbol}
+      draggableId={pair.symbol}
+      index={index}
+    >
+      {(provided, snapshot) => (
+        <TableRow
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          className={cn(
+            "border-b dark:border-gray-800 hover:bg-gray-800/30 dark:hover:bg-gray-800/70",
+            snapshot.isDragging && "bg-gray-100 dark:bg-gray-800",
+            "cursor-move"
+          )}
+        >
+          <TableCell className="w-[140px]">
+            <div className="flex items-center gap-2">
+              {pair.symbol}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "icon-button h-7 w-7",
+                    notificationSettings[pair.symbol]
+                      ? "text-amber-500 active-icon" 
+                      : "text-gray-400 hover:text-amber-400"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAlert(pair.symbol);
+                  }}
+                >
+                  <Bell
+                    className={cn(
+                      "bell-icon h-4 w-4",
+                      notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                    )}
+                  />
+                </Button>
+                {/* Add the test button here */}
+                {/* <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={testBellSound}
+                  className="h-7 w-7"
+                >
+                  Test
+                </Button> */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "icon-button h-7 w-7",
+                    pair.pinned 
+                      ? "text-blue-500 active-icon" 
+                      : "text-gray-400 hover:text-blue-400"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePin(pair.symbol);
+                  }}
+                >
+                  <Pin
+                    className={cn(
+                      "pin-icon h-4 w-4",
+                      pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                    )}
+                  />
+                </Button>
+                {sortByBuySignals && (
+                  <Badge variant="secondary" className="text-xs">
+                    {countBuySignals(pair)} buys
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </TableCell>
+          <TableCell className="text-right pr-6">
+            {pair.price?.toFixed(4)}
+          </TableCell>
+          {timeframes.map((tf) => (
+            <TableCell 
+              key={tf}
+              className="text-center relative w-[140px] px-3"
+            >
+              <MemoizedIndicators 
+                pair={pair} 
+                timeframe={tf} 
+                settings={settings}
+              />
+            </TableCell>
+          ))}
+        </TableRow>
+      )}
+    </Draggable>
+  ), [timeframes, settings]);
 
   // Add this function to test the bell sound
   const testBellSound = () => {
@@ -809,8 +963,7 @@ const PairsTable = () => {
           <Input
             type="search"
             placeholder="Search tokens..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => debouncedSetSearchQuery(e.target.value)}
             className="flex-1 min-w-0 max-w-[200px]"
           />
           <Button
@@ -849,101 +1002,7 @@ const PairsTable = () => {
                     {...provided.droppableProps}
                     ref={provided.innerRef}
                   >
-                    {sortedPairs.map((pair, index) => (
-                      <Draggable
-                        key={pair.symbol}
-                        draggableId={pair.symbol}
-                        index={index}
-                      >
-                        {(provided, snapshot) => (
-                          <TableRow
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className={cn(
-                              "border-b dark:border-gray-800 hover:bg-gray-800/30 dark:hover:bg-gray-800/70",
-                              snapshot.isDragging && "bg-gray-100 dark:bg-gray-800",
-                              "cursor-move" // Add cursor indicator
-                            )}
-                          >
-                            <TableCell className="w-[140px]">
-                              <div className="flex items-center gap-2">
-                                {pair.symbol}
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={cn(
-                                      "icon-button h-7 w-7",
-                                      notificationSettings[pair.symbol]
-                                        ? "text-amber-500 active-icon" 
-                                        : "text-gray-400 hover:text-amber-400"
-                                    )}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleAlert(pair.symbol);
-                                    }}
-                                  >
-                                    <Bell
-                                      className={cn(
-                                        "bell-icon h-4 w-4",
-                                        notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
-                                      )}
-                                    />
-                                  </Button>
-                                  {/* Add the test button here */}
-                                  {/* <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={testBellSound}
-                                    className="h-7 w-7"
-                                  >
-                                    Test
-                                  </Button> */}
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={cn(
-                                      "icon-button h-7 w-7",
-                                      pair.pinned 
-                                        ? "text-blue-500 active-icon" 
-                                        : "text-gray-400 hover:text-blue-400"
-                                    )}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      togglePin(pair.symbol);
-                                    }}
-                                  >
-                                    <Pin
-                                      className={cn(
-                                        "pin-icon h-4 w-4",
-                                        pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
-                                      )}
-                                    />
-                                  </Button>
-                                  {sortByBuySignals && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {countBuySignals(pair)} buys
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right pr-6">
-                              {pair.price?.toFixed(4)}
-                            </TableCell>
-                            {timeframes.map((tf) => (
-                              <TableCell 
-                                key={tf}
-                                className="text-center relative w-[140px] px-3"
-                              >
-                                {renderIndicators(pair, tf)}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        )}
-                      </Draggable>
-                    ))}
+                    {sortedPairs.map((pair, index) => renderTableRow(pair, index))}
                     {provided.placeholder}
                   </TableBody>
                 )}
