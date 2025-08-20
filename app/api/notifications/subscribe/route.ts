@@ -4,13 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 // For now, we'll use a simple in-memory store
 const subscriptions = new Map<string, any>();
 
-interface PushSubscriptionData {
-  endpoint: string;
-  keys: {
-    p256dh: string;
-    auth: string;
-  };
-}
 
 // POST /api/notifications/subscribe - Subscribe to push notifications
 export async function POST(request: NextRequest) {
@@ -116,15 +109,6 @@ export async function GET() {
   }
 }
 
-// Export function to get all active subscriptions (for internal use)
-export function getAllActiveSubscriptions(): PushSubscriptionData[] {
-  return Array.from(subscriptions.values())
-    .filter((sub) => sub.isActive)
-    .map((sub) => ({
-      endpoint: sub.endpoint,
-      keys: sub.keys,
-    }));
-}
 
 
 
