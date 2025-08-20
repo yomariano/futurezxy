@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Table,
@@ -7,48 +7,79 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { Activity, Waves, LineChart, BarChart2, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, Bell, Pin, Settings } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+} from "@/components/ui/table";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Activity,
+  Waves,
+  LineChart,
+  BarChart2,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Bell,
+  Pin,
+  Settings,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
-type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h';
+type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h";
 
 // Update the signal types to include extreme states
-type SignalType = 'buy' | 'sell' | 'neutral' | 'near-buy' | 'near-sell' | 'extreme-buy' | 'extreme-sell';
+type SignalType =
+  | "buy"
+  | "sell"
+  | "neutral"
+  | "near-buy"
+  | "near-sell"
+  | "extreme-buy"
+  | "extreme-sell";
 
 // Update the color function
 const getSignalColor = (signal: SignalType, settings: WaveTrendSettings) => {
   switch (signal) {
-    case 'extreme-buy':
-      return 'text-green-600 dark:text-green-500';
-    case 'buy':
-      return 'text-green-500 dark:text-green-400';
-    case 'near-buy':
-      return 'text-emerald-500 dark:text-emerald-400';
-    case 'extreme-sell':
-      return 'text-red-600 dark:text-red-500';
-    case 'sell':
-      return 'text-red-500 dark:text-red-400';
-    case 'near-sell':
-      return 'text-rose-500 dark:text-rose-400';
+    case "extreme-buy":
+      return "text-green-600 dark:text-green-500";
+    case "buy":
+      return "text-green-500 dark:text-green-400";
+    case "near-buy":
+      return "text-emerald-500 dark:text-emerald-400";
+    case "extreme-sell":
+      return "text-red-600 dark:text-red-500";
+    case "sell":
+      return "text-red-500 dark:text-red-400";
+    case "near-sell":
+      return "text-rose-500 dark:text-rose-400";
     default:
-      return 'text-blue-500 dark:text-blue-400';
+      return "text-blue-500 dark:text-blue-400";
   }
 };
 
 // Add this new interface near other interfaces
 interface ColorChangeTimestamp {
   timestamp: number;
-  color: 'red' | 'green';
+  color: "red" | "green";
 }
 
 // Add new interface for the WebSocket message
@@ -70,89 +101,103 @@ interface TradingPair {
   alerts?: boolean;
   pinned?: boolean;
   signals: Record<Timeframe, SignalType>;
-  indicators: Record<Timeframe, {
-    wt1: number;
-    wt2: number;
-    sma50: number;
-    sma200: number;
-    rsi: number;
-    colorChanges?: {
-      wt1?: ColorChangeTimestamp;
-      wt2?: ColorChangeTimestamp;
-    };
-    signals?: {
-      bearish_divergence: boolean;
-      bullish_divergence: boolean;
-      hidden_bearish_divergence: boolean;
-      hidden_bullish_divergence: boolean;
-      overbought: boolean;
-      oversold: boolean;
-      price_above_sma50: boolean;
-      price_above_sma200: boolean;
-      sma50_above_sma200: boolean;
-    };
-  }>;
+  indicators: Record<
+    Timeframe,
+    {
+      wt1: number;
+      wt2: number;
+      sma50: number;
+      sma200: number;
+      rsi: number;
+      colorChanges?: {
+        wt1?: ColorChangeTimestamp;
+        wt2?: ColorChangeTimestamp;
+      };
+      signals?: {
+        bearish_divergence: boolean;
+        bullish_divergence: boolean;
+        hidden_bearish_divergence: boolean;
+        hidden_bullish_divergence: boolean;
+        overbought: boolean;
+        oversold: boolean;
+        price_above_sma50: boolean;
+        price_above_sma200: boolean;
+        sma50_above_sma200: boolean;
+      };
+    }
+  >;
   order?: number;
 }
 
 // Modify calculateSignal to accept settings as a parameter
-const calculateSignal = (wt: number, settings: WaveTrendSettings): SignalType => {
-  console.log('Calculating signal:', { wt, settings });
-  
+const calculateSignal = (
+  wt: number,
+  settings: WaveTrendSettings
+): SignalType => {
+  console.log("Calculating signal:", { wt, settings });
+
   const TRANSITION_PERCENTAGE = 0.05;
-  
-  const buyTransitionZone = settings.buyThreshold + (Math.abs(settings.buyThreshold) * TRANSITION_PERCENTAGE);
-  const sellTransitionZone = settings.sellThreshold - (settings.sellThreshold * TRANSITION_PERCENTAGE);
+
+  const buyTransitionZone =
+    settings.buyThreshold +
+    Math.abs(settings.buyThreshold) * TRANSITION_PERCENTAGE;
+  const sellTransitionZone =
+    settings.sellThreshold - settings.sellThreshold * TRANSITION_PERCENTAGE;
 
   if (wt <= settings.extremeBuyThreshold) {
-    return 'extreme-buy';
+    return "extreme-buy";
   }
   if (wt >= settings.extremeSellThreshold) {
-    return 'extreme-sell';
+    return "extreme-sell";
   }
   if (wt <= settings.buyThreshold) {
-    return 'buy';
+    return "buy";
   }
   if (wt <= buyTransitionZone) {
-    return 'near-buy';
+    return "near-buy";
   }
   if (wt >= settings.sellThreshold) {
-    return 'sell';
+    return "sell";
   }
   if (wt >= sellTransitionZone) {
-    return 'near-sell';
+    return "near-sell";
   }
-  return 'neutral';
+  return "neutral";
 };
 
 // Add this helper function at the top of the file, with the other utility functions
 const timeframeOrder: Record<string, number> = {
-  '1m': 1,
-  '5m': 2,
-  '15m': 3,
-  '30m': 4,
-  '1h': 5,
-  '4h': 6,
-  '1d': 7,
-  '1w': 8,
+  "1m": 1,
+  "5m": 2,
+  "15m": 3,
+  "30m": 4,
+  "1h": 5,
+  "4h": 6,
+  "1d": 7,
+  "1w": 8,
 };
 
 // Add this helper function at the top of the file
 const timeframeToMinutes = (timeframe: string): number => {
   const value = parseInt(timeframe);
   const unit = timeframe.slice(-1);
-  
-  switch(unit) {
-    case 'm': return value;
-    case 'h': return value * 60;
-    case 'd': return value * 60 * 24;
-    case 'w': return value * 60 * 24 * 7;
-    default: return 0;
+
+  switch (unit) {
+    case "m":
+      return value;
+    case "h":
+      return value * 60;
+    case "d":
+      return value * 60 * 24;
+    case "w":
+      return value * 60 * 24 * 7;
+    default:
+      return 0;
   }
 };
 
 interface IndicatorMessage {
-  type: 'indicators';
+  type: "indicators";
   symbol: string;
   timeframe: string;
   timestamp: string;
@@ -160,9 +205,13 @@ interface IndicatorMessage {
   rsi: number;
   wt1: number;
   wt2: number;
-  sma50: number;
-  sma200: number;
-  signals: {
+  sma50?: number; // Optional since Node.js API doesn't provide these yet
+  sma200?: number; // Optional since Node.js API doesn't provide these yet
+  rsi_divergences: {
+    bullish: boolean;
+    bearish: boolean;
+  };
+  signals?: {
     bearish_divergence: boolean;
     bullish_divergence: boolean;
     cross_over: boolean;
@@ -189,13 +238,13 @@ interface CrossSignals {
   symbol: string;
   timeframe: Timeframe;
   timestamp: number;
-  type: 'cross_over' | 'cross_under';
+  type: "cross_over" | "cross_under";
 }
 
 // Add with other utility functions
 const countBuySignals = (pair: TradingPair): number => {
   return Object.values(pair.signals).reduce((count, signal) => {
-    if (signal === 'extreme-buy' || signal === 'buy' || signal === 'near-buy') {
+    if (signal === "extreme-buy" || signal === "buy" || signal === "near-buy") {
       return count + 1;
     }
     return count;
@@ -203,12 +252,12 @@ const countBuySignals = (pair: TradingPair): number => {
 };
 
 // Add these constants right after the imports and before any type definitions
-const EXTREME_THRESHOLD = 80;  // For WaveTrend extreme signals
-const RSI_OVERBOUGHT = 70;     // For RSI overbought
-const RSI_OVERSOLD = 30;       // For RSI oversold
+const EXTREME_THRESHOLD = 80; // For WaveTrend extreme signals
+const RSI_OVERBOUGHT = 70; // For RSI overbought
+const RSI_OVERSOLD = 30; // For RSI oversold
 
 // Add this near the top of the file after imports
-const NOTIFICATION_SETTINGS_KEY = 'pairNotificationSettings';
+const NOTIFICATION_SETTINGS_KEY = "pairNotificationSettings";
 
 // Add this interface with the other interfaces
 interface NotificationSettings {
@@ -217,23 +266,27 @@ interface NotificationSettings {
 
 // Replace the audio file constant and add this utility function
 const createBellSound = () => {
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-  
+  const audioContext = new (window.AudioContext ||
+    (window as any).webkitAudioContext)();
+
   return () => {
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    
+
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
-    
+
     // Bell-like sound settings
-    oscillator.type = 'sine';
+    oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(830, audioContext.currentTime); // Higher frequency for bell sound
-    
+
     // Volume envelope
     gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-    
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      audioContext.currentTime + 0.5
+    );
+
     // Play sound
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.5);
@@ -241,12 +294,12 @@ const createBellSound = () => {
 };
 
 // Add these constants at the top of the file
-const SETTINGS_KEY = 'waveTrendSettings';
+const SETTINGS_KEY = "waveTrendSettings";
 const DEFAULT_SETTINGS = {
   buyThreshold: -53,
   sellThreshold: 53,
   extremeBuyThreshold: -80,
-  extremeSellThreshold: 80
+  extremeSellThreshold: 80,
 };
 
 // Add this interface with other interfaces
@@ -258,25 +311,27 @@ interface WaveTrendSettings {
 }
 
 // Add this constant with other constants
-const PINNED_PAIRS_KEY = 'pinnedPairs';
+const PINNED_PAIRS_KEY = "pinnedPairs";
 
 // Add this near your other utility functions
 const showNotification = (symbol: string, message: string) => {
-  console.log('Attempting to show notification:', { symbol, message });
-  
-  if ('Notification' in window) {
-    console.log('Notification permission:', Notification.permission);
-    
-    if (Notification.permission === 'granted') {
-      const notificationSettings = JSON.parse(localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || '{}');
-      console.log('Notification settings:', notificationSettings);
-      
+  console.log("Attempting to show notification:", { symbol, message });
+
+  if ("Notification" in window) {
+    console.log("Notification permission:", Notification.permission);
+
+    if (Notification.permission === "granted") {
+      const notificationSettings = JSON.parse(
+        localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || "{}"
+      );
+      console.log("Notification settings:", notificationSettings);
+
       if (notificationSettings[symbol]) {
         try {
           const notification = new Notification(`${symbol} Trading Alert 📈`, {
             body: message,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico',
+            icon: "/favicon.ico",
+            badge: "/favicon.ico",
             tag: `trading-${symbol}`,
             requireInteraction: true,
             silent: false,
@@ -287,15 +342,15 @@ const showNotification = (symbol: string, message: string) => {
             notification.close();
           };
 
-          console.log('Notification sent successfully');
+          console.log("Notification sent successfully");
         } catch (error) {
-          console.error('Error sending notification:', error);
+          console.error("Error sending notification:", error);
         }
       }
-    } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(permission => {
-        console.log('Permission requested:', permission);
-        if (permission === 'granted') {
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        console.log("Permission requested:", permission);
+        if (permission === "granted") {
           showNotification(symbol, message);
         }
       });
@@ -305,15 +360,15 @@ const showNotification = (symbol: string, message: string) => {
 
 // Update the testNotification function
 const testNotification = (playBellSound?: () => void) => {
-  if ('Notification' in window) {
-    if (Notification.permission === 'granted') {
+  if ("Notification" in window) {
+    if (Notification.permission === "granted") {
       try {
         // Create notification with supported options
-        const notification = new Notification('Trading Alert 📈', {
-          body: 'This is a test trading notification',
-          icon: '/favicon.ico',
-          badge: '/favicon.ico',
-          tag: 'test-notification',
+        const notification = new Notification("Trading Alert 📈", {
+          body: "This is a test trading notification",
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: "test-notification",
           requireInteraction: true, // Notification persists until user interacts
           silent: false, // Allow system sound
         });
@@ -327,17 +382,19 @@ const testNotification = (playBellSound?: () => void) => {
         // Play custom sound
         playBellSound?.();
       } catch (error) {
-        console.error('Error sending test notification:', error);
+        console.error("Error sending test notification:", error);
       }
-    } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
           testNotification(playBellSound);
         }
       });
     } else {
       // If notifications are denied, show a message to the user
-      alert('Please enable notifications in your browser settings to receive trading alerts.');
+      alert(
+        "Please enable notifications in your browser settings to receive trading alerts."
+      );
     }
   }
 };
@@ -348,24 +405,27 @@ const PairsTable = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const connectionAttempted = useRef(false);
-  const [previousPrices, setPreviousPrices] = useState<Record<string, number>>({});
+  const [previousPrices, setPreviousPrices] = useState<Record<string, number>>(
+    {}
+  );
   const [timeframes, setTimeframes] = useState<Timeframe[]>([]);
   const [crossSignals, setCrossSignals] = useState<CrossSignals[]>([]);
   const [sortByBuySignals, setSortByBuySignals] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notificationSettings, setNotificationSettings] =
+    useState<NotificationSettings>({});
   const [playBell, setPlayBell] = useState<(() => void) | null>(null);
   const [settings, setSettings] = useState<WaveTrendSettings>(DEFAULT_SETTINGS);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Load saved order on mount
   useEffect(() => {
-    const savedOrder = localStorage.getItem('pairsOrder');
+    const savedOrder = localStorage.getItem("pairsOrder");
     if (savedOrder) {
       const orderMap = JSON.parse(savedOrder);
-      setPairs(current => 
-        [...current].sort((a, b) => 
-          (orderMap[a.symbol] || 0) - (orderMap[b.symbol] || 0)
+      setPairs((current) =>
+        [...current].sort(
+          (a, b) => (orderMap[a.symbol] || 0) - (orderMap[b.symbol] || 0)
         )
       );
     }
@@ -373,7 +433,7 @@ const PairsTable = () => {
 
   // Add with other useEffects
   useEffect(() => {
-    const savedSort = localStorage.getItem('sortByBuySignals');
+    const savedSort = localStorage.getItem("sortByBuySignals");
     if (savedSort) {
       setSortByBuySignals(JSON.parse(savedSort));
     }
@@ -383,7 +443,7 @@ const PairsTable = () => {
   useEffect(() => {
     // Initialize bell sound
     setPlayBell(() => createBellSound());
-    
+
     // Load notification settings from localStorage
     const savedSettings = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
     if (savedSettings) {
@@ -404,10 +464,10 @@ const PairsTable = () => {
     const savedPinnedPairs = localStorage.getItem(PINNED_PAIRS_KEY);
     if (savedPinnedPairs) {
       const pinnedPairsMap = JSON.parse(savedPinnedPairs);
-      setPairs(current => 
-        current.map(pair => ({
+      setPairs((current) =>
+        current.map((pair) => ({
           ...pair,
-          pinned: pinnedPairsMap[pair.symbol] || false
+          pinned: pinnedPairsMap[pair.symbol] || false,
         }))
       );
     }
@@ -415,71 +475,76 @@ const PairsTable = () => {
 
   // Add this useEffect to request notification permission on component mount
   useEffect(() => {
-    if ('Notification' in window) {
+    if ("Notification" in window) {
       // Request permission on component mount
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(permission => {
-          console.log('Notification permission status:', permission);
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then((permission) => {
+          console.log("Notification permission status:", permission);
         });
       }
-      
+
       // Log current permission status
-      console.log('Current notification permission:', Notification.permission);
+      console.log("Current notification permission:", Notification.permission);
     } else {
-      console.log('Notifications not supported in this browser');
+      console.log("Notifications not supported in this browser");
     }
   }, []);
 
   const handleIndicatorMessage = (data: IndicatorMessage) => {
-    console.log('Received indicator message:', data);
-    console.log('Current settings:', settings);
-    
+    console.log("Received indicator message:", data);
+    console.log("Current settings:", settings);
+
     const signal = calculateSignal(data.wt1, settings);
-    console.log('Calculated signal:', signal);
-    
+    console.log("Calculated signal:", signal);
+
     // Update timeframes if we receive a new one
-    setTimeframes(current => {
+    setTimeframes((current) => {
       if (!current.includes(data.timeframe as Timeframe)) {
-        return [...current, data.timeframe as Timeframe]
-          .sort((a, b) => timeframeToMinutes(a) - timeframeToMinutes(b));
+        return [...current, data.timeframe as Timeframe].sort(
+          (a, b) => timeframeToMinutes(a) - timeframeToMinutes(b)
+        );
       }
       return current;
     });
-    
-    setPairs(currentPairs => {
+
+    setPairs((currentPairs) => {
       // Find existing pair
-      const existingPair = currentPairs.find(p => p.symbol === data.symbol);
+      const existingPair = currentPairs.find((p) => p.symbol === data.symbol);
       const previousSignal = existingPair?.signals[data.timeframe as Timeframe];
-      
+
       // Check if this is a new buy signal
-      const isNewBuySignal = (
-        signal === 'buy' || 
-        signal === 'extreme-buy' || 
-        signal === 'near-buy'
-      ) && previousSignal !== signal;
+      const isNewBuySignal =
+        (signal === "buy" ||
+          signal === "extreme-buy" ||
+          signal === "near-buy") &&
+        previousSignal !== signal;
 
       // If it's a new buy signal on 1m timeframe, trigger notification
-      if (data.timeframe === '1m' && 
-          isNewBuySignal && 
-          notificationSettings[data.symbol]) {
-        console.log('Triggering notification for:', data.symbol);
+      if (
+        data.timeframe === "1m" &&
+        isNewBuySignal &&
+        notificationSettings[data.symbol]
+      ) {
+        console.log("Triggering notification for:", data.symbol);
         playBell?.();
         showNotification(
           data.symbol,
-          `New buy signal detected (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`
+          `New buy signal detected (WT1: ${data.wt1.toFixed(
+            2
+          )}, WT2: ${data.wt2.toFixed(2)})`
         );
       }
 
       // Update pair data
       if (existingPair) {
-        return currentPairs.map(pair => 
+        return currentPairs.map((pair) =>
           pair.symbol === data.symbol
             ? {
                 ...pair,
                 price: data.price,
                 signals: {
                   ...pair.signals,
-                  [data.timeframe]: signal
+                  [data.timeframe]: signal,
                 },
                 indicators: {
                   ...pair.indicators,
@@ -487,11 +552,27 @@ const PairsTable = () => {
                     wt1: data.wt1,
                     wt2: data.wt2,
                     rsi: data.rsi,
-                    sma50: data.sma50,
-                    sma200: data.sma200,
-                    signals: data.signals
-                  }
-                }
+                    sma50: data.sma50 || data.price, // Use price as fallback for SMA50
+                    sma200: data.sma200 || data.price, // Use price as fallback for SMA200
+                    signals: data.signals || {
+                      bearish_divergence:
+                        data.rsi_divergences?.bearish || false,
+                      bullish_divergence:
+                        data.rsi_divergences?.bullish || false,
+                      hidden_bearish_divergence: false,
+                      hidden_bullish_divergence: false,
+                      overbought: data.rsi > 70,
+                      oversold: data.rsi < 30,
+                      price_above_sma50:
+                        data.price > (data.sma50 || data.price),
+                      price_above_sma200:
+                        data.price > (data.sma200 || data.price),
+                      sma50_above_sma200:
+                        (data.sma50 || data.price) >
+                        (data.sma200 || data.price),
+                    },
+                  },
+                },
               }
             : pair
         );
@@ -500,52 +581,71 @@ const PairsTable = () => {
         const newPair: TradingPair = {
           symbol: data.symbol,
           price: data.price,
-          signals: { [data.timeframe]: signal } as Record<Timeframe, SignalType>,
+          signals: { [data.timeframe]: signal } as Record<
+            Timeframe,
+            SignalType
+          >,
           indicators: {
             [data.timeframe]: {
               wt1: data.wt1,
               wt2: data.wt2,
               rsi: data.rsi,
-              sma50: data.sma50,
-              sma200: data.sma200
+              sma50: data.sma50 || data.price,
+              sma200: data.sma200 || data.price,
+              signals: data.signals || {
+                bearish_divergence: data.rsi_divergences?.bearish || false,
+                bullish_divergence: data.rsi_divergences?.bullish || false,
+                hidden_bearish_divergence: false,
+                hidden_bullish_divergence: false,
+                overbought: data.rsi > 70,
+                oversold: data.rsi < 30,
+                price_above_sma50: data.price > (data.sma50 || data.price),
+                price_above_sma200: data.price > (data.sma200 || data.price),
+                sma50_above_sma200:
+                  (data.sma50 || data.price) > (data.sma200 || data.price),
+              },
+            },
+          } as Record<
+            Timeframe,
+            {
+              wt1: number;
+              wt2: number;
+              rsi: number;
+              sma50: number;
+              sma200: number;
+              signals?: any;
             }
-          } as Record<Timeframe, {
-            wt1: number;
-            wt2: number;
-            rsi: number;
-            sma50: number;
-            sma200: number;
-          }>
+          >,
         };
         return [...currentPairs, newPair];
       }
     });
 
     // Add debug logging
-    if (data.signals.cross_over || data.signals.cross_under) {
-      console.log('Cross signal detected:', {
+    if (data.signals?.cross_over || data.signals?.cross_under) {
+      console.log("Cross signal detected:", {
         symbol: data.symbol,
         timeframe: data.timeframe,
         crossOver: data.signals.cross_over,
-        crossUnder: data.signals.cross_under
+        crossUnder: data.signals.cross_under,
       });
     }
 
-    // Handle cross signals
-    if (data.signals.cross_over || data.signals.cross_under) {
+    // Handle cross signals - check if signals object exists first
+    if (data.signals?.cross_over || data.signals?.cross_under) {
       const newSignal: CrossSignals = {
         symbol: data.symbol,
         timeframe: data.timeframe as Timeframe,
         timestamp: Date.now(),
-        type: data.signals.cross_over ? 'cross_over' : 'cross_under'
+        type: data.signals.cross_over ? "cross_over" : "cross_under",
       };
-      
-      console.log('Adding new cross signal:', newSignal);
-      
-      setCrossSignals(prev => {
+
+      console.log("Adding new cross signal:", newSignal);
+
+      setCrossSignals((prev) => {
         // Remove any existing signals for this symbol/timeframe combination
-        const filtered = prev.filter(s => 
-          !(s.symbol === data.symbol && s.timeframe === data.timeframe)
+        const filtered = prev.filter(
+          (s) => !(s.symbol === data.symbol && s.timeframe === data.timeframe)
         );
         return [...filtered, newSignal];
       });
@@ -554,109 +654,110 @@ const PairsTable = () => {
 
   const connectWebSocket = () => {
     setIsLoading(true);
-    
+
     try {
-        const url = 'ws://localhost:8765'
-        //const url = 'wss://your-trading-bot.fly.dev/ws'
+      const url = "ws://localhost:8081";
+      //const url = 'wss://your-trading-bot.fly.dev/ws'
 
-        console.log('🔄 Attempting WebSocket connection to:', url);
-        
-        // Close existing connection if any
-        if (ws) {
-            console.log('🔌 Closing existing connection');
-            ws.close();
-        }
+      console.log("🔄 Attempting WebSocket connection to:", url);
 
-        const testWs = new WebSocket(url);
-            
-        testWs.onopen = () => {
-            console.log('🟢 WebSocket connection established');
-            setIsConnected(true);
-            setIsLoading(false);
-            setWs(testWs);
-            
-            // Send initial subscription message
-            pairs.forEach(pair => {
-              const subscribeMessage = {
-                type: 'subscribe',
-                symbol: pair.symbol
-              };
-              testWs.send(JSON.stringify(subscribeMessage));
-            });
-            console.log('📤 Sent subscription messages:', pairs);
-        };
-            
-        testWs.onclose = (event) => {
-            console.log('🔴 WebSocket connection closed:', {
-                code: event.code,
-                reason: event.reason,
-                wasClean: event.wasClean,
-                timestamp: new Date().toISOString()
-            });
-            
-            setIsConnected(false);
-            setIsLoading(false);
-            setWs(null);
+      // Close existing connection if any
+      if (ws) {
+        console.log("🔌 Closing existing connection");
+        ws.close();
+      }
 
-            // Attempt to reconnect after 5 seconds if it wasn't a clean close
-            if (!event.wasClean) {
-                console.log('🔄 Scheduling reconnection attempt...');
-                setTimeout(() => {
-                    console.log('🔄 Attempting to reconnect...');
-                    connectWebSocket();
-                }, 5000);
-            }
-        };
-            
-        testWs.onerror = (error) => {
-            console.error('❌ WebSocket error occurred:', {
-                error,
-                timestamp: new Date().toISOString(),
-                readyState: testWs.readyState,
-                // Log the WebSocket ready state as a string for better debugging
-                readyStateString: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][testWs.readyState]
-            });
-        };
-            
-        testWs.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            console.log('📨 Received message:', data);
+      const testWs = new WebSocket(url);
 
-            if (data.type === 'indicators') {
-              handleIndicatorMessage(data as IndicatorMessage);
-            }
-        };
-
-    } catch (error) {
-        console.error('💥 Failed to setup WebSocket:', error);
+      testWs.onopen = () => {
+        console.log("🟢 WebSocket connection established");
+        setIsConnected(true);
         setIsLoading(false);
+        setWs(testWs);
+
+        // Send initial subscription message
+        pairs.forEach((pair) => {
+          const subscribeMessage = {
+            type: "subscribe",
+            symbol: pair.symbol,
+          };
+          testWs.send(JSON.stringify(subscribeMessage));
+        });
+        console.log("📤 Sent subscription messages:", pairs);
+      };
+
+      testWs.onclose = (event) => {
+        console.log("🔴 WebSocket connection closed:", {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+          timestamp: new Date().toISOString(),
+        });
+
         setIsConnected(false);
+        setIsLoading(false);
+        setWs(null);
+
+        // Attempt to reconnect after 5 seconds if it wasn't a clean close
+        if (!event.wasClean) {
+          console.log("🔄 Scheduling reconnection attempt...");
+          setTimeout(() => {
+            console.log("🔄 Attempting to reconnect...");
+            connectWebSocket();
+          }, 5000);
+        }
+      };
+
+      testWs.onerror = (error) => {
+        console.error("❌ WebSocket error occurred:", {
+          error,
+          timestamp: new Date().toISOString(),
+          readyState: testWs.readyState,
+          // Log the WebSocket ready state as a string for better debugging
+          readyStateString: ["CONNECTING", "OPEN", "CLOSING", "CLOSED"][
+            testWs.readyState
+          ],
+        });
+      };
+
+      testWs.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("📨 Received message:", data);
+
+        if (data.type === "indicators") {
+          handleIndicatorMessage(data as IndicatorMessage);
+        }
+      };
+    } catch (error) {
+      console.error("💥 Failed to setup WebSocket:", error);
+      setIsLoading(false);
+      setIsConnected(false);
     }
-};
+  };
 
   useEffect(() => {
     if (connectionAttempted.current) return;
     connectionAttempted.current = true;
-    
+
     connectWebSocket();
 
     // Cleanup function
     return () => {
-        if (ws) {
-            console.log('🧹 Cleaning up WebSocket connection');
-            ws.close(1000, 'Component unmounting'); // 1000 is normal closure
-            setWs(null);
-            setIsConnected(false);
-        }
+      if (ws) {
+        console.log("🧹 Cleaning up WebSocket connection");
+        ws.close(1000, "Component unmounting"); // 1000 is normal closure
+        setWs(null);
+        setIsConnected(false);
+      }
     };
-}, []); // Ensure this array is empty to run only once on mount
+  }, []); // Ensure this array is empty to run only once on mount
 
   // Clean up expired signals
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      setCrossSignals(prev => 
-        prev.filter(signal => now - signal.timestamp < 5000)
+      setCrossSignals((prev) =>
+        prev.filter((signal) => now - signal.timestamp < 5000)
       );
     }, 1000);
 
@@ -666,32 +767,29 @@ const PairsTable = () => {
   // Add this helper function
   const getCrossSignal = (symbol: string, timeframe: Timeframe) => {
     return crossSignals.find(
-      signal => signal.symbol === symbol && 
-               signal.timeframe === timeframe &&
-               Date.now() - signal.timestamp < 5000 // Only return if less than 5 seconds old
+      (signal) =>
+        signal.symbol === symbol &&
+        signal.timeframe === timeframe &&
+        Date.now() - signal.timestamp < 5000 // Only return if less than 5 seconds old
     );
   };
 
   // Modify renderSignal to use the indicators directly
   const renderSignal = (pair: TradingPair, timeframe: Timeframe) => {
     const indicator = pair.indicators[timeframe];
-    
+
     if (!indicator) {
-      return (
-        <div className="text-muted-foreground">
-          Waiting for data...
-        </div>
-      );
+      return <div className="text-muted-foreground">Waiting for data...</div>;
     }
-    
+
     // Recalculate signal using current settings
     const currentSignal = calculateSignal(indicator.wt1, settings);
-    
+
     return (
       <div className={getSignalColor(currentSignal, settings)}>
         <span className="text-[8px]">
-         WT1: {indicator.wt1?.toFixed(2)}, 
-          WT2: {indicator.wt2?.toFixed(2)}<br/>
+          WT1: {indicator.wt1?.toFixed(2)}, WT2: {indicator.wt2?.toFixed(2)}
+          <br />
         </span>
       </div>
     );
@@ -700,83 +798,88 @@ const PairsTable = () => {
   // Modify the connect button handler
   const handleConnectionToggle = () => {
     if (isConnected && ws) {
-        console.log('👋 User initiated disconnect');
-        ws.close(1000, 'User initiated disconnect');
-        setWs(null);
-        setIsConnected(false);
+      console.log("👋 User initiated disconnect");
+      ws.close(1000, "User initiated disconnect");
+      setWs(null);
+      setIsConnected(false);
     } else {
-        console.log('🤝 User initiated connect');
-        connectWebSocket();
+      console.log("🤝 User initiated connect");
+      connectWebSocket();
     }
-};
+  };
 
   // Add this function to handle drag end
   const onDragEnd = (result: any) => {
     if (!result.destination) return;
-    
+
     const items = Array.from(pairs);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
-    
+
     // Create order map
-    const orderMap = items.reduce((acc, item, index) => ({
-      ...acc,
-      [item.symbol]: index
-    }), {});
-    
+    const orderMap = items.reduce(
+      (acc, item, index) => ({
+        ...acc,
+        [item.symbol]: index,
+      }),
+      {}
+    );
+
     // Save to localStorage
-    localStorage.setItem('pairsOrder', JSON.stringify(orderMap));
-    
+    localStorage.setItem("pairsOrder", JSON.stringify(orderMap));
+
     // Update state
     setPairs(items);
   };
 
-  const filteredPairs = pairs.filter(pair =>
+  const filteredPairs = pairs.filter((pair) =>
     pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const toggleAlert = (symbol: string) => {
-    setPairs(current =>
-      current.map(pair =>
-        pair.symbol === symbol
-          ? { ...pair, alerts: !pair.alerts }
-          : pair
+    setPairs((current) =>
+      current.map((pair) =>
+        pair.symbol === symbol ? { ...pair, alerts: !pair.alerts } : pair
       )
     );
 
     // Update notification settings in state and localStorage
-    setNotificationSettings(prev => {
+    setNotificationSettings((prev) => {
       const newSettings = {
         ...prev,
-        [symbol]: !prev[symbol]
+        [symbol]: !prev[symbol],
       };
-      localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(newSettings));
+      localStorage.setItem(
+        NOTIFICATION_SETTINGS_KEY,
+        JSON.stringify(newSettings)
+      );
       return newSettings;
     });
   };
 
   // Update the togglePin function to use localStorage
   const togglePin = (symbol: string) => {
-    setPairs(current => {
-      const updatedPairs = current.map(pair =>
-        pair.symbol === symbol
-          ? { ...pair, pinned: !pair.pinned }
-          : pair
+    setPairs((current) => {
+      const updatedPairs = current.map((pair) =>
+        pair.symbol === symbol ? { ...pair, pinned: !pair.pinned } : pair
       );
-      
+
       // Save pinned status to localStorage
-      const pinnedPairsMap = updatedPairs.reduce((acc, pair) => ({
-        ...acc,
-        [pair.symbol]: pair.pinned
-      }), {});
+      const pinnedPairsMap = updatedPairs.reduce(
+        (acc, pair) => ({
+          ...acc,
+          [pair.symbol]: pair.pinned,
+        }),
+        {}
+      );
       localStorage.setItem(PINNED_PAIRS_KEY, JSON.stringify(pinnedPairsMap));
-      
+
       return updatedPairs;
     });
   };
 
   // Modify your sorting logic to account for pins
-  const sortedPairs = sortByBuySignals 
+  const sortedPairs = sortByBuySignals
     ? [...filteredPairs].sort((a, b) => {
         // First sort by pinned status
         if (a.pinned && !b.pinned) return -1;
@@ -797,88 +900,102 @@ const PairsTable = () => {
   const handleSortToggle = () => {
     const newValue = !sortByBuySignals;
     setSortByBuySignals(newValue);
-    localStorage.setItem('sortByBuySignals', JSON.stringify(newValue));
+    localStorage.setItem("sortByBuySignals", JSON.stringify(newValue));
   };
 
-  const renderIndicators = useCallback((pair: TradingPair, timeframe: Timeframe) => {
-    const indicator = pair.indicators[timeframe];
-    
-    if (!indicator) {
+  const renderIndicators = useCallback(
+    (pair: TradingPair, timeframe: Timeframe) => {
+      const indicator = pair.indicators[timeframe];
+
+      if (!indicator) {
+        return (
+          <div className="text-muted-foreground">
+            <Activity className="w-4 h-4 animate-pulse" />
+          </div>
+        );
+      }
+
+      const getIndicatorColor = (value: number, type: "wt" | "rsi" | "sma") => {
+        if (type === "wt") {
+          if (value >= settings.extremeSellThreshold) return "text-red-500";
+          if (value <= settings.extremeBuyThreshold) return "text-green-500";
+          if (value >= settings.sellThreshold) return "text-red-400";
+          if (value <= settings.buyThreshold) return "text-green-400";
+          return "text-blue-400";
+        } else if (type === "rsi") {
+          if (value >= RSI_OVERBOUGHT) return "text-red-500";
+          if (value <= RSI_OVERSOLD) return "text-green-500";
+          return "text-blue-400";
+        } else {
+          // sma
+          return indicator.signals?.price_above_sma50
+            ? "text-green-400"
+            : "text-red-400";
+        }
+      };
+
       return (
-        <div className="text-muted-foreground">
-          <Activity className="w-4 h-4 animate-pulse" />
+        <div className="flex flex-col gap-0.5 p-0.5">
+          {/* WaveTrend 1 and 2 */}
+          <div className="flex flex-row items-center justify-center gap-1">
+            <div
+              className={cn(
+                "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+                "bg-background/50 hover:bg-background/80 transition-colors",
+                getIndicatorColor(indicator.wt1, "wt")
+              )}
+            >
+              <Waves className="w-3 h-3" />
+              <span className="text-xs font-medium">
+                {indicator.wt1?.toFixed(1)}
+              </span>
+            </div>
+            <div
+              className={cn(
+                "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+                "bg-background/50 hover:bg-background/80 transition-colors",
+                getIndicatorColor(indicator.wt2, "wt")
+              )}
+            >
+              <Waves className="w-3 h-3" />
+              <span className="text-xs font-medium">
+                {indicator.wt2?.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          {/* RSI and SMA50 */}
+          <div className="flex flex-row items-center justify-center gap-1">
+            <div
+              className={cn(
+                "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+                "bg-background/50 hover:bg-background/80 transition-colors",
+                getIndicatorColor(indicator.rsi, "rsi")
+              )}
+            >
+              <LineChart className="w-3 h-3" />
+              <span className="text-xs font-medium">
+                {indicator.rsi?.toFixed(1)}
+              </span>
+            </div>
+            <div
+              className={cn(
+                "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
+                "bg-background/50 hover:bg-background/80 transition-colors",
+                getIndicatorColor(indicator.sma50, "sma")
+              )}
+            >
+              <BarChart2 className="w-3 h-3" />
+              <span className="text-xs font-medium">
+                {indicator.sma50?.toFixed(1)}
+              </span>
+            </div>
+          </div>
         </div>
       );
-    }
-
-    const getIndicatorColor = (value: number, type: 'wt' | 'rsi' | 'sma') => {
-      if (type === 'wt') {
-        if (value >= settings.extremeSellThreshold) return "text-red-500";
-        if (value <= settings.extremeBuyThreshold) return "text-green-500";
-        if (value >= settings.sellThreshold) return "text-red-400";
-        if (value <= settings.buyThreshold) return "text-green-400";
-        return "text-blue-400";
-      } else if (type === 'rsi') {
-        if (value >= RSI_OVERBOUGHT) return "text-red-500";
-        if (value <= RSI_OVERSOLD) return "text-green-500";
-        return "text-blue-400";
-      } else { // sma
-        return indicator.signals?.price_above_sma50 ? "text-green-400" : "text-red-400";
-      }
-    };
-
-    return (
-      <div className="flex flex-col gap-0.5 p-0.5">
-        {/* WaveTrend 1 and 2 */}
-        <div className="flex flex-row items-center justify-center gap-1">
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.wt1, 'wt')
-          )}>
-            <Waves className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.wt1?.toFixed(1)}
-            </span>
-          </div>
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.wt2, 'wt')
-          )}>
-            <Waves className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.wt2?.toFixed(1)}
-            </span>
-          </div>
-        </div>
-
-        {/* RSI and SMA50 */}
-        <div className="flex flex-row items-center justify-center gap-1">
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.rsi, 'rsi')
-          )}>
-            <LineChart className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.rsi?.toFixed(1)}
-            </span>
-          </div>
-          <div className={cn(
-            "flex items-center gap-0.5 rounded-sm px-0.5 py-0.5",
-            "bg-background/50 hover:bg-background/80 transition-colors",
-            getIndicatorColor(indicator.sma50, 'sma')
-          )}>
-            <BarChart2 className="w-3 h-3" />
-            <span className="text-xs font-medium">
-              {indicator.sma50?.toFixed(1)}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }, [settings]);
+    },
+    [settings]
+  );
 
   // Add this function to test the bell sound
   const testBellSound = () => {
@@ -887,27 +1004,30 @@ const PairsTable = () => {
 
   // Modify saveSettings to include debugging
   const saveSettings = (newSettings: WaveTrendSettings) => {
-    console.log('Saving new settings:', newSettings);
+    console.log("Saving new settings:", newSettings);
     setSettings(newSettings);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
-    
+
     // Recalculate signals for all pairs with new settings
-    setPairs(currentPairs => {
-      return currentPairs.map(pair => {
-        const newSignals = Object.entries(pair.indicators).reduce((acc, [timeframe, indicator]) => {
-          return {
-            ...acc,
-            [timeframe]: calculateSignal(indicator.wt1, newSettings)
-          };
-        }, {} as Record<Timeframe, SignalType>);
+    setPairs((currentPairs) => {
+      return currentPairs.map((pair) => {
+        const newSignals = Object.entries(pair.indicators).reduce(
+          (acc, [timeframe, indicator]) => {
+            return {
+              ...acc,
+              [timeframe]: calculateSignal(indicator.wt1, newSettings),
+            };
+          },
+          {} as Record<Timeframe, SignalType>
+        );
 
         return {
           ...pair,
-          signals: newSignals
+          signals: newSignals,
         };
       });
     });
-    
+
     setShowSettingsModal(false);
   };
 
@@ -925,7 +1045,7 @@ const PairsTable = () => {
             Sort by Buy Signals {sortByBuySignals && `(Active)`}
           </Label>
         </div>
-        
+
         <div className="flex items-center space-x-2 min-w-0">
           <Input
             type="search"
@@ -955,8 +1075,8 @@ const PairsTable = () => {
                   <TableHead className="text-left w-[140px]">Symbol</TableHead>
                   <TableHead className="text-right w-[80px]">Price</TableHead>
                   {timeframes.map((tf) => (
-                    <TableHead 
-                      key={tf} 
+                    <TableHead
+                      key={tf}
                       className="text-center text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800/50 w-[140px] px-3"
                     >
                       {tf}
@@ -983,7 +1103,8 @@ const PairsTable = () => {
                             {...provided.dragHandleProps}
                             className={cn(
                               "border-b dark:border-gray-800 hover:bg-gray-800/30 dark:hover:bg-gray-800/70",
-                              snapshot.isDragging && "bg-gray-100 dark:bg-gray-800",
+                              snapshot.isDragging &&
+                                "bg-gray-100 dark:bg-gray-800",
                               "cursor-move" // Add cursor indicator
                             )}
                           >
@@ -997,7 +1118,7 @@ const PairsTable = () => {
                                     className={cn(
                                       "icon-button h-7 w-7",
                                       notificationSettings[pair.symbol]
-                                        ? "text-amber-500 active-icon" 
+                                        ? "text-amber-500 active-icon"
                                         : "text-gray-400 hover:text-amber-400"
                                     )}
                                     onClick={(e) => {
@@ -1008,7 +1129,8 @@ const PairsTable = () => {
                                     <Bell
                                       className={cn(
                                         "bell-icon h-4 w-4",
-                                        notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                                        notificationSettings[pair.symbol] &&
+                                          "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
                                       )}
                                     />
                                   </Button>
@@ -1026,8 +1148,8 @@ const PairsTable = () => {
                                     size="icon"
                                     className={cn(
                                       "icon-button h-7 w-7",
-                                      pair.pinned 
-                                        ? "text-blue-500 active-icon" 
+                                      pair.pinned
+                                        ? "text-blue-500 active-icon"
                                         : "text-gray-400 hover:text-blue-400"
                                     )}
                                     onClick={(e) => {
@@ -1038,12 +1160,16 @@ const PairsTable = () => {
                                     <Pin
                                       className={cn(
                                         "pin-icon h-4 w-4",
-                                        pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                                        pair.pinned &&
+                                          "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
                                       )}
                                     />
                                   </Button>
                                   {sortByBuySignals && (
-                                    <Badge variant="secondary" className="text-xs">
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
                                       {countBuySignals(pair)} buys
                                     </Badge>
                                   )}
@@ -1054,8 +1180,8 @@ const PairsTable = () => {
                               {pair.price?.toFixed(2)}
                             </TableCell>
                             {timeframes.map((tf) => (
-                              <TableCell 
-                                key={tf} 
+                              <TableCell
+                                key={tf}
                                 className="text-center relative w-[140px] px-3"
                               >
                                 {renderIndicators(pair, tf)}
@@ -1083,7 +1209,7 @@ const PairsTable = () => {
               Adjust the thresholds for WaveTrend signals.
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Add this section before the grid of settings */}
           <div className="flex items-center justify-between py-2 border-b">
             <div className="space-y-1">
@@ -1116,13 +1242,13 @@ const PairsTable = () => {
                 onChange={(e) => {
                   const newSettings = {
                     ...settings,
-                    buyThreshold: Number(e.target.value)
+                    buyThreshold: Number(e.target.value),
                   };
                   setSettings(newSettings);
                 }}
               />
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="sellThreshold" className="text-right">
                 Sell Threshold
@@ -1135,13 +1261,13 @@ const PairsTable = () => {
                 onChange={(e) => {
                   const newSettings = {
                     ...settings,
-                    sellThreshold: Number(e.target.value)
+                    sellThreshold: Number(e.target.value),
                   };
                   setSettings(newSettings);
                 }}
               />
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="extremeBuyThreshold" className="text-right">
                 Extreme Buy
@@ -1154,13 +1280,13 @@ const PairsTable = () => {
                 onChange={(e) => {
                   const newSettings = {
                     ...settings,
-                    extremeBuyThreshold: Number(e.target.value)
+                    extremeBuyThreshold: Number(e.target.value),
                   };
                   setSettings(newSettings);
                 }}
               />
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="extremeSellThreshold" className="text-right">
                 Extreme Sell
@@ -1173,7 +1299,7 @@ const PairsTable = () => {
                 onChange={(e) => {
                   const newSettings = {
                     ...settings,
-                    extremeSellThreshold: Number(e.target.value)
+                    extremeSellThreshold: Number(e.target.value),
                   };
                   setSettings(newSettings);
                 }}
@@ -1182,22 +1308,18 @@ const PairsTable = () => {
           </div>
 
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowSettingsModal(false)}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={() => saveSettings(settings)}
-            >
-              Save Changes
-            </Button>
+            <Button onClick={() => saveSettings(settings)}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
+  );
+};
 
-export default PairsTable
+export default PairsTable;
