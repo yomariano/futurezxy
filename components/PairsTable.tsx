@@ -656,7 +656,7 @@ const PairsTable = () => {
     setIsLoading(true);
 
     try {
-      const url = "ws://localhost:8081";
+      const url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8081";
       //const url = 'wss://your-trading-bot.fly.dev/ws'
 
       console.log("🔄 Attempting WebSocket connection to:", url);
