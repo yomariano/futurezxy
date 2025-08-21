@@ -422,6 +422,9 @@ const PairsTable = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const connectionAttempted = useRef(false);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = useRef(5);
+  const reconnectTimeoutId = useRef<NodeJS.Timeout | null>(null);
   const [previousPrices, setPreviousPrices] = useState<Record<string, number>>({});
   const [timeframes, setTimeframes] = useState<Timeframe[]>([]);
   const [crossSignals, setCrossSignals] = useState<CrossSignals[]>([]);
@@ -591,19 +594,20 @@ const PairsTable = () => {
             
         testWs.onopen = () => {
             console.log('🟢 WebSocket connection established');
+            // Reset reconnection counter on successful connection
+            reconnectAttempts.current = 0;
             setIsConnected(true);
             setIsLoading(false);
             setWs(testWs);
             
-            // Send initial subscription message
-            pairs.forEach(pair => {
-              const subscribeMessage = {
-                type: 'subscribe',
-                symbol: pair.symbol
-              };
-              testWs.send(JSON.stringify(subscribeMessage));
-            });
-            console.log('📤 Sent subscription messages:', pairs);
+            // Send initial subscription message with all symbols
+            const symbols = pairs.map(pair => pair.symbol);
+            const subscribeMessage = {
+              type: 'subscribe',
+              symbols: symbols
+            };
+            testWs.send(JSON.stringify(subscribeMessage));
+            console.log('📤 Sent subscription message for symbols:', symbols);
         };
             
         testWs.onclose = (event) => {
@@ -611,34 +615,97 @@ const PairsTable = () => {
                 code: event.code,
                 reason: event.reason,
                 wasClean: event.wasClean,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                attempts: reconnectAttempts.current
             });
             
             setIsConnected(false);
             setIsLoading(false);
             setWs(null);
 
-            // Attempt to reconnect after 5 seconds if it wasn't a clean close
-            if (!event.wasClean) {
-                console.log('🔄 Scheduling reconnection attempt...');
-                setTimeout(() => {
-                    console.log('🔄 Attempting to reconnect...');
+            // Clear any existing timeout
+            if (reconnectTimeoutId.current) {
+                clearTimeout(reconnectTimeoutId.current);
+            }
+
+            // Only reconnect if:
+            // 1. Not a clean close (user didn't intentionally disconnect)
+            // 2. Haven't exceeded max attempts
+            // 3. Error code suggests temporary issue (1006 = abnormal closure)
+            if (!event.wasClean && 
+                reconnectAttempts.current < maxReconnectAttempts.current && 
+                (event.code === 1006 || event.code === 1001 || event.code === 1011)) {
+                
+                reconnectAttempts.current++;
+                // Exponential backoff: 2^attempts * 1000ms (1s, 2s, 4s, 8s, 16s)
+                const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000);
+                
+                console.log(`🔄 Scheduling reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts.current} in ${delay}ms...`);
+                
+                reconnectTimeoutId.current = setTimeout(() => {
+                    console.log(`🔄 Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts.current})...`);
                     connectWebSocket();
-                }, 5000);
+                }, delay);
+            } else {
+                console.log('❌ Not reconnecting:', {
+                    wasClean: event.wasClean,
+                    attempts: reconnectAttempts.current,
+                    maxAttempts: maxReconnectAttempts.current,
+                    code: event.code
+                });
             }
         };
             
         testWs.onerror = (error) => {
-            console.error(' Failed to setup WebSocket:', error);
+            console.error('❌ WebSocket error occurred:', {
+                error: error,
+                timestamp: new Date().toISOString(),
+                readyState: testWs.readyState,
+                readyStateString: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][testWs.readyState],
+                url: url
+            });
+            setIsLoading(false);
+            setIsConnected(false);
         };
             
         testWs.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            console.log('📨 Received message:', data);
-
-            if (data.type === 'indicators') {
-              handleIndicatorMessage(data as WaveTrendMessage);
+            try {
+                const message = JSON.parse(event.data);
+                console.log('📨 Received message type:', message.type);
+                
+                if (message.type === 'connection') {
+                    console.log('🔗 Connection established:', message.message);
+                    // Handle initial data if provided
+                    if (message.data) {
+                        console.log('📋 Processing initial trading data');
+                        processTraidingData(message.data);
+                    }
+                } else if (message.type === 'trading_data') {
+                    console.log('📊 Processing trading data update');
+                    processTraidingData(message.data);
+                } else if (message.type === 'indicators') {
+                    // Legacy support
+                    handleIndicatorMessage(message as WaveTrendMessage);
+                } else {
+                    console.log('🔍 Unknown message type:', message.type);
+                }
+            } catch (error) {
+                console.error('😵 Error parsing WebSocket message:', error);
             }
+        };
+        
+        // Function to process trading data from WebSocket
+        const processTraidingData = (data: any) => {
+            // Convert backend data format to frontend format
+            Object.keys(data).forEach(symbol => {
+                const symbolData = data[symbol];
+                Object.keys(symbolData).forEach(timeframe => {
+                    const indicators = symbolData[timeframe];
+                    if (indicators && indicators.type === 'indicators') {
+                        handleIndicatorMessage(indicators as WaveTrendMessage);
+                    }
+                });
+            });
         };
 
     } catch (error) {
