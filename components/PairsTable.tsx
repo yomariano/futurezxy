@@ -659,9 +659,27 @@ const PairsTable = () => {
     setIsLoading(true);
 
     try {
-      const url = process.env.NEXT_PUBLIC_WS_URL || "ws://api.signalstrading.app:8081";
-      //const url = 'wss://your-trading-bot.fly.dev/ws'
-
+      // Ensure we always use the correct WebSocket URL
+      const envUrl = process.env.NEXT_PUBLIC_WS_URL;
+      const defaultUrl = "ws://api.signalstrading.app:8081";
+      
+      // Force correct URL if environment variable is incorrect
+      let url = envUrl || defaultUrl;
+      
+      // Fix common misconfigurations
+      if (url === "wss://api.signalstrading.app" || url === "wss://api.signalstrading.app/") {
+        console.log("🔧 Fixing incorrect WSS URL to WS with port");
+        url = "ws://api.signalstrading.app:8081";
+      }
+      
+      // Ensure we have the port
+      if (url.includes("api.signalstrading.app") && !url.includes(":8081")) {
+        console.log("🔧 Adding missing port 8081");
+        url = url.replace("api.signalstrading.app", "api.signalstrading.app:8081");
+      }
+      
+      console.log("🔄 Environment URL:", envUrl);
+      console.log("🔄 Final WebSocket URL:", url);
       console.log("🔄 Attempting WebSocket connection to:", url);
 
       // Close existing connection if any
