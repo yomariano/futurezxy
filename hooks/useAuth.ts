@@ -7,12 +7,13 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Bypass authentication for localhost development
+    // Only bypass authentication for localhost development (not production)
     if (
       typeof window !== "undefined" &&
-      window.location.hostname === "localhost"
+      window.location.hostname === "localhost" &&
+      process.env.NODE_ENV === "development"
     ) {
-      // Create a mock user for localhost development
+      // Create a mock user for localhost development only
       const mockUser = {
         id: "localhost-user",
         app_metadata: {
