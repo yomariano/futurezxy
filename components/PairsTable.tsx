@@ -661,21 +661,30 @@ const PairsTable = () => {
     try {
       // Ensure we always use the correct WebSocket URL
       const envUrl = process.env.NEXT_PUBLIC_WS_URL;
-      const defaultUrl = "ws://api.signalstrading.app:8081";
+      const defaultUrl = "wss://api.signalstrading.app:8081";
       
       // Force correct URL if environment variable is incorrect
       let url = envUrl || defaultUrl;
       
-      // Fix common misconfigurations
-      if (url === "wss://api.signalstrading.app" || url === "wss://api.signalstrading.app/") {
-        console.log("🔧 Fixing incorrect WSS URL to WS with port");
-        url = "ws://api.signalstrading.app:8081";
+      // Fix common misconfigurations - ensure we use WSS for secure connection
+      if (url === "ws://api.signalstrading.app:8081" || url === "ws://api.signalstrading.app") {
+        console.log("🔧 Upgrading insecure WS to secure WSS");
+        url = "wss://api.signalstrading.app:8081";
       }
       
-      // Ensure we have the port
+      // Ensure we have the port and use WSS
       if (url.includes("api.signalstrading.app") && !url.includes(":8081")) {
-        console.log("🔧 Adding missing port 8081");
+        console.log("🔧 Adding missing port 8081 with WSS");
         url = url.replace("api.signalstrading.app", "api.signalstrading.app:8081");
+        if (!url.startsWith("wss://")) {
+          url = url.replace(/^ws:\/\//, "wss://");
+        }
+      }
+      
+      // Ensure we use WSS protocol for security
+      if (url.startsWith("ws://") && url.includes("signalstrading.app")) {
+        console.log("🔧 Converting WS to WSS for security");
+        url = url.replace("ws://", "wss://");
       }
       
       console.log("🔄 Environment URL:", envUrl);
@@ -764,6 +773,18 @@ const PairsTable = () => {
         });
         setIsLoading(false);
         setIsConnected(false);
+        
+        // For mobile compatibility, try reconnecting after a short delay
+        if (reconnectAttempts.current < maxReconnectAttempts.current) {
+          reconnectAttempts.current++;
+          const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 10000);
+          console.log(`🔄 Scheduling error recovery reconnection in ${delay}ms...`);
+          
+          setTimeout(() => {
+            console.log("🔄 Attempting error recovery reconnection...");
+            connectWebSocket();
+          }, delay);
+        }
       };
 
       testWs.onmessage = (event) => {
