@@ -690,6 +690,12 @@ const PairsTable = () => {
       console.log("🔄 Environment URL:", envUrl);
       console.log("🔄 Final WebSocket URL:", url);
       console.log("🔄 Attempting WebSocket connection to:", url);
+      console.log("🔄 Browser info:", {
+        userAgent: navigator.userAgent,
+        isSecureContext: window.isSecureContext,
+        location: window.location.origin,
+        protocol: window.location.protocol
+      });
 
       // Close existing connection if any
       if (ws) {
@@ -700,7 +706,14 @@ const PairsTable = () => {
       const testWs = new WebSocket(url);
 
       testWs.onopen = () => {
-        console.log("🟢 WebSocket connection established");
+        console.log("🟢 WebSocket connection established successfully");
+        console.log("🟢 Connection details:", {
+          readyState: testWs.readyState,
+          url: testWs.url,
+          protocol: testWs.protocol,
+          extensions: testWs.extensions
+        });
+        
         // Reset reconnection counter on successful connection
         reconnectAttempts.current = 0;
         setIsConnected(true);
@@ -779,11 +792,19 @@ const PairsTable = () => {
           reconnectAttempts.current++;
           const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 10000);
           console.log(`🔄 Scheduling error recovery reconnection in ${delay}ms...`);
+          console.log("🔄 Will try alternative URL if this attempt fails");
           
           setTimeout(() => {
             console.log("🔄 Attempting error recovery reconnection...");
             connectWebSocket();
           }, delay);
+        } else {
+          console.log("❌ Max reconnection attempts reached. Please refresh page or check network.");
+          // Try one more time with the direct port connection
+          if (!url.includes(":8081")) {
+            console.log("🔄 Trying direct port connection as last resort");
+            setTimeout(() => connectWebSocket(), 5000);
+          }
         }
       };
 
