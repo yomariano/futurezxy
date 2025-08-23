@@ -314,7 +314,89 @@ interface WaveTrendSettings {
 // Add this constant with other constants
 const PINNED_PAIRS_KEY = "pinnedPairs";
 
+// Global audio context for better mobile compatibility
+let audioContext: AudioContext | null = null;
+
+// Initialize audio context on user interaction
+const initAudioContext = () => {
+  if (!audioContext) {
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      console.log("🎵 Audio context initialized");
+    } catch (error) {
+      console.error("Failed to initialize audio context:", error);
+    }
+  }
+  
+  // Resume audio context if it's suspended (required for mobile)
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume().then(() => {
+      console.log("🎵 Audio context resumed");
+    });
+  }
+};
+
 // Add this near your other utility functions
+const playNotificationSound = async () => {
+  try {
+    // Ensure audio context is ready
+    initAudioContext();
+    
+    if (!audioContext || audioContext.state !== 'running') {
+      console.warn("Audio context not ready, trying alternative methods");
+      // Try HTML5 Audio as fallback
+      try {
+        // Create a data URL for a simple beep sound
+        const beepSound = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmMcBT2X2u/Ecs" +
+          "0EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFApGn+DyvmMcBT2X2u/Ec80EJHXF8N2QQQoUXrTp66hVFA==");
+        beepSound.volume = 0.3;
+        await beepSound.play();
+        console.log("🔊 Fallback beep sound played");
+        return;
+      } catch (e) {
+        console.warn("HTML5 Audio also failed:", e);
+      }
+    }
+
+    if (audioContext && audioContext.state === 'running') {
+      // Create a pleasant two-tone notification sound
+      const oscillator1 = audioContext.createOscillator();
+      const oscillator2 = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      // Connect the nodes
+      oscillator1.connect(gainNode);
+      oscillator2.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Configure the sound - pleasant notification tones
+      oscillator1.type = 'sine';
+      oscillator1.frequency.setValueAtTime(880, audioContext.currentTime); // A note
+      
+      oscillator2.type = 'sine';
+      oscillator2.frequency.setValueAtTime(1174.66, audioContext.currentTime); // D note (perfect fourth)
+      
+      // Volume envelope for a pleasant sound
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+      
+      // Play the sound
+      const now = audioContext.currentTime;
+      oscillator1.start(now);
+      oscillator2.start(now + 0.1); // Slight delay for harmony
+      
+      oscillator1.stop(now + 0.6);
+      oscillator2.stop(now + 0.8);
+      
+      console.log("🔊 Web Audio notification sound played");
+    }
+  } catch (error) {
+    console.error("Error playing notification sound:", error);
+    console.log("🔕 Using silent notification");
+  }
+};
+
 const showNotification = (symbol: string, message: string) => {
   console.log("Attempting to show notification:", { symbol, message });
 
@@ -329,6 +411,9 @@ const showNotification = (symbol: string, message: string) => {
 
       if (notificationSettings[symbol]) {
         try {
+          // Play sound first
+          playNotificationSound();
+          
           const notification = new Notification(`${symbol} Trading Alert 📈`, {
             body: message,
             icon: "/favicon.ico",
@@ -343,7 +428,7 @@ const showNotification = (symbol: string, message: string) => {
             notification.close();
           };
 
-          console.log("Notification sent successfully");
+          console.log("✅ Notification sent successfully with sound");
         } catch (error) {
           console.error("Error sending notification:", error);
         }
@@ -500,7 +585,7 @@ const PairsTable = () => {
     }
   }, []);
 
-  // Add this useEffect to request notification permission on component mount
+  // Add this useEffect to request notification permission and initialize audio on component mount
   useEffect(() => {
     if ("Notification" in window) {
       // Request permission on component mount
@@ -515,6 +600,25 @@ const PairsTable = () => {
     } else {
       console.log("Notifications not supported in this browser");
     }
+
+    // Initialize audio context on first user interaction
+    const handleUserInteraction = () => {
+      initAudioContext();
+      // Remove listeners after first interaction
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+    };
+
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+    document.addEventListener('keydown', handleUserInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+    };
   }, []);
 
   const handleIndicatorMessage = (data: IndicatorMessage) => {
@@ -1109,12 +1213,30 @@ const PairsTable = () => {
     pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleAlert = (symbol: string) => {
+  const toggleAlert = async (symbol: string) => {
+    // Initialize audio context on user interaction (important for mobile)
+    initAudioContext();
+    
+    // Request notification permission if not granted
+    if ("Notification" in window && Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      console.log("Notification permission requested:", permission);
+    }
+
+    const currentPair = pairs.find(pair => pair.symbol === symbol);
+    const willBeEnabled = !currentPair?.alerts;
+
     setPairs((current) =>
       current.map((pair) =>
         pair.symbol === symbol ? { ...pair, alerts: !pair.alerts } : pair
       )
     );
+
+    // Test notification when enabling alerts
+    if (willBeEnabled && Notification.permission === "granted") {
+      console.log("Testing notification for", symbol);
+      showNotification(symbol, `🔔 Notifications enabled for ${symbol}! You'll hear this sound when signals trigger.`);
+    }
 
     // Update notification settings in state and localStorage
     setNotificationSettings((prev) => {
