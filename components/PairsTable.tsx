@@ -599,7 +599,7 @@ const PairsTable = () => {
   const [settings, setSettings] = useState<WaveTrendSettings>(DEFAULT_SETTINGS);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [notificationLogs, setNotificationLogs] = useState<string[]>([]);
-  const [showDebugConsole, setShowDebugConsole] = useState(true);
+  const [showNotificationConsole, setShowNotificationConsole] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -1661,10 +1661,10 @@ const PairsTable = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowDebugConsole(!showDebugConsole)}
+            onClick={() => setShowNotificationConsole(!showNotificationConsole)}
             className="flex-shrink-0"
           >
-            {showDebugConsole ? "Hide Debug" : "Show Debug"}
+{showNotificationConsole ? "Hide Notifications" : "Show Notifications"}
           </Button>
           <Button
             variant="outline"
@@ -1780,7 +1780,7 @@ const PairsTable = () => {
       )}
 
       {/* Push Notification Console */}
-      {showDebugConsole && (
+      {showNotificationConsole && (
         <div className="mb-4 p-4 bg-blue-950 text-blue-200 rounded-lg font-mono text-xs max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-blue-300 font-bold flex items-center gap-2">
