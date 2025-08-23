@@ -26,9 +26,24 @@ export function PushNotificationSetup() {
   const checkSubscriptionStatus = async () => {
     try {
       const status = await getSubscriptionStatus();
+      console.log('📱 Mobile subscription check result:', status);
       setIsSubscribed(status.isSubscribed);
     } catch (error) {
-      console.error('Error checking subscription status:', error);
+      console.error('❌ Error checking subscription status:', error);
+      // On mobile, sometimes the check fails but subscription might still exist
+      // Try an alternative check
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          if (registration) {
+            const subscription = await registration.pushManager.getSubscription();
+            setIsSubscribed(!!subscription);
+            console.log('📱 Alternative mobile check - subscription found:', !!subscription);
+          }
+        } catch (altError) {
+          console.error('❌ Alternative check also failed:', altError);
+        }
+      }
     }
   };
 
@@ -175,9 +190,13 @@ export function PushNotificationSetup() {
             ) : (
               <span className="text-gray-500">Not subscribed</span>
             )}
+            {/* Debug info for troubleshooting */}
+            <div className="mt-1 text-xs opacity-50">
+              Support: {isSupported ? '✓' : '✗'} | Permission: {permission} | Loading: {isLoading ? '✓' : '✗'}
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {isSubscribed ? (
             <>
               <Button 
@@ -185,6 +204,7 @@ export function PushNotificationSetup() {
                 disabled={isLoading}
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 Test Notification
               </Button>
@@ -193,6 +213,7 @@ export function PushNotificationSetup() {
                 disabled={isLoading}
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 {isLoading ? 'Unsubscribing...' : 'Unsubscribe'}
               </Button>
@@ -202,6 +223,7 @@ export function PushNotificationSetup() {
               onClick={handleSubscribe} 
               disabled={isLoading}
               size="sm"
+              className="w-full sm:w-auto"
             >
               {isLoading ? 'Setting up...' : 'Enable Push Notifications'}
             </Button>
