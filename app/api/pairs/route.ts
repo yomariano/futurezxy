@@ -26,7 +26,7 @@ if (pairs.length === 0) {
   pairs = [
     {
       symbol: 'BTCUSDT',
-      exchange: 'binance',
+      exchange: 'mexc',
       price: 0,
       change24h: 0,
       volume24h: 0,
@@ -37,7 +37,7 @@ if (pairs.length === 0) {
     },
     {
       symbol: 'ETHUSDT',
-      exchange: 'binance',
+      exchange: 'mexc',
       price: 0,
       change24h: 0,
       volume24h: 0,
@@ -106,10 +106,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create new pair
+    // Create new pair (only MEXC exchange supported)
     const newPair: TradingPair = {
       symbol: normalizedSymbol,
-      exchange: body.exchange || 'binance',
+      exchange: 'mexc', // Fixed to MEXC only
       price: 0,
       change24h: 0,
       volume24h: 0,

@@ -20,7 +20,7 @@ interface AddPairDialogProps {
 export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
   const [open, setOpen] = useState(false)
   const [symbol, setSymbol] = useState("")
-  const [exchange, setExchange] = useState("binance")
+  const [exchange] = useState("mexc") // Fixed to MEXC only
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -84,7 +84,6 @@ export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
       if (!newOpen) {
         // Reset form when closing
         setSymbol("")
-        setExchange("binance")
         setError(null)
         setSuccess(null)
       }
@@ -99,14 +98,19 @@ export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
           Add Trading Pair
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add New Trading Pair</DialogTitle>
+      <DialogContent className="w-[95vw] max-w-md mx-auto p-4 sm:p-6">
+        <DialogHeader className="text-center sm:text-left">
+          <DialogTitle className="text-lg sm:text-xl">Add New Trading Pair</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Add a new trading pair to MEXC exchange
+          </p>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="symbol">Trading Pair Symbol</Label>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="space-y-3">
+            <Label htmlFor="symbol" className="text-sm font-medium">
+              Trading Pair Symbol
+            </Label>
             <Input
               id="symbol"
               value={symbol}
@@ -114,26 +118,16 @@ export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
               placeholder="e.g., BTCUSDT, ETHUSDT"
               required
               disabled={loading}
+              className="h-12 text-base sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">
-              Enter symbol without separators (e.g., BTCUSDT not BTC/USDT)
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="exchange">Exchange</Label>
-            <select
-              id="exchange"
-              value={exchange}
-              onChange={(e) => setExchange(e.target.value)}
-              disabled={loading}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="binance">Binance</option>
-              <option value="coinbase">Coinbase</option>
-              <option value="kraken">Kraken</option>
-              <option value="bybit">Bybit</option>
-            </select>
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                💡 Enter symbol without separators (e.g., BTCUSDT not BTC/USDT)
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                🏢 Exchange: MEXC
+              </p>
+            </div>
           </div>
 
           {error && (
@@ -150,9 +144,13 @@ export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {loading ? "Adding Pair..." : "Add Pair"}
+          <Button 
+            type="submit" 
+            className="w-full h-12 text-base font-semibold bg-green-600 hover:bg-green-700 text-white mt-6" 
+            disabled={loading}
+          >
+            {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+            {loading ? "Adding Pair..." : "Add Pair to MEXC"}
           </Button>
         </form>
       </DialogContent>
