@@ -1,9 +1,12 @@
 "use client";
 
-import AddPairDialog from "@/components/AddPairDialog";
-import PairsTable from "@/components/PairsTable";
-import NotificationPermission from "@/components/NotificationPermission";
+import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
+
+// Dynamic imports with no SSR to avoid window reference issues
+const AddPairDialog = dynamic(() => import("@/components/AddPairDialog"), { ssr: false });
+const PairsTable = dynamic(() => import("@/components/PairsTable"), { ssr: false });
+const NotificationPermission = dynamic(() => import("@/components/NotificationPermission"), { ssr: false });
 
 export default function SignalsPage() {
   const handlePairAdded = (pair: any) => {

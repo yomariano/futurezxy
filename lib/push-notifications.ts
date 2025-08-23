@@ -18,7 +18,7 @@ export interface NotificationPayload {
   data?: Record<string, any>;
 }
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
 
 /**
  * Check if push notifications are supported in the current browser
@@ -40,6 +40,10 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     throw new Error("Push notifications are not supported in this browser");
   }
 
+  if (typeof window === 'undefined') {
+    return 'default';
+  }
+
   let permission = Notification.permission;
 
   if (permission === "default") {
@@ -53,6 +57,10 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
  * Register service worker and get push subscription
  */
 export async function registerServiceWorkerAndSubscribe(): Promise<PushSubscription | null> {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   try {
     // Register service worker
     const registration = await navigator.serviceWorker.register("/sw.js", {
@@ -69,10 +77,14 @@ export async function registerServiceWorkerAndSubscribe(): Promise<PushSubscript
 
     if (!subscription) {
       // Create new subscription
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+      if (VAPID_PUBLIC_KEY) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      } else {
+        throw new Error('VAPID public key is not configured');
+      }
     }
 
     return subscription;
@@ -89,13 +101,13 @@ export async function registerServiceWorkerAndSubscribe(): Promise<PushSubscript
  * Convert VAPID key from base64 to Uint8Array
  */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-
-  if (typeof window === 'undefined') {
-    // Server-side fallback - return empty array
+  if (typeof window === 'undefined' || !base64String) {
+    // Server-side fallback or empty string - return empty array
     return new Uint8Array(0);
   }
+
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
 
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
@@ -172,6 +184,10 @@ export async function subscribeToPushNotifications(): Promise<{
  * Unsubscribe from push notifications
  */
 export async function unsubscribeFromPushNotifications(): Promise<boolean> {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
   try {
     const registration = await navigator.serviceWorker.getRegistration();
     if (registration) {
@@ -197,6 +213,10 @@ export async function getSubscriptionStatus(): Promise<{
 }> {
   try {
     if (!isPushNotificationSupported()) {
+      return { isSubscribed: false };
+    }
+
+    if (typeof window === 'undefined') {
       return { isSubscribed: false };
     }
 
@@ -238,6 +258,10 @@ export async function getSubscriptionStatus(): Promise<{
 export function showLocalNotification(payload: NotificationPayload): void {
   if (!isPushNotificationSupported()) {
     console.error("Notifications are not supported");
+    return;
+  }
+
+  if (typeof window === 'undefined') {
     return;
   }
 
