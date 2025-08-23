@@ -14,11 +14,13 @@ export default function SignalsPage() {
   return (
     <div className="h-full w-full">
       <div className="p-2 sm:p-6 space-y-6 min-w-0">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-foreground dark:text-white">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-white">
             Trading Pairs
           </h1>
-          <AddPairDialog onPairAdded={handlePairAdded} />
+          <div className="w-full sm:w-auto">
+            <AddPairDialog onPairAdded={handlePairAdded} />
+          </div>
         </div>
 
         <NotificationPermission className="mb-6" />

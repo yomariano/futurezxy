@@ -94,7 +94,7 @@ export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold">
           <Plus className="mr-2 h-4 w-4" />
           Add Trading Pair
         </Button>
