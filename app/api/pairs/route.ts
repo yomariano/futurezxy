@@ -77,7 +77,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Normalize symbol (remove any special characters and convert to uppercase)
-    const normalizedSymbol = body.symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    let normalizedSymbol = body.symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    
+    // Add underscore before USDT if not present (for MEXC format)
+    if (normalizedSymbol.endsWith('USDT') && !normalizedSymbol.includes('_')) {
+      normalizedSymbol = normalizedSymbol.replace('USDT', '_USDT');
+    }
+    // Add underscore before other common quote currencies
+    if (normalizedSymbol.endsWith('BTC') && !normalizedSymbol.includes('_')) {
+      normalizedSymbol = normalizedSymbol.replace('BTC', '_BTC');
+    }
+    if (normalizedSymbol.endsWith('ETH') && !normalizedSymbol.includes('_')) {
+      normalizedSymbol = normalizedSymbol.replace('ETH', '_ETH');
+    }
     
     if (normalizedSymbol.length < 3) {
       return NextResponse.json(

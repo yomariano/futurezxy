@@ -26,6 +26,7 @@ import {
   Bell,
   Pin,
   Settings,
+  Trash2,
 } from "lucide-react";
 import {
   Tooltip,
@@ -1044,6 +1045,40 @@ const PairsTable = () => {
   };
 
   // Add this function to handle drag end
+  const removePair = async (symbol: string) => {
+    try {
+      const response = await fetch(`/api/pairs?symbol=${encodeURIComponent(symbol)}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Remove from local state
+        setPairs((current) => current.filter(pair => pair.symbol !== symbol));
+        
+        // Remove from localStorage pinned pairs
+        const pinnedPairsJson = localStorage.getItem(PINNED_PAIRS_KEY);
+        if (pinnedPairsJson) {
+          const pinnedPairs = JSON.parse(pinnedPairsJson);
+          delete pinnedPairs[symbol];
+          localStorage.setItem(PINNED_PAIRS_KEY, JSON.stringify(pinnedPairs));
+        }
+
+        debugLog(`🗑️ Removed trading pair: ${symbol}`);
+        
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('pairRemoved', { 
+          detail: { symbol } 
+        }));
+      } else {
+        debugLog(`❌ Failed to remove pair: ${data.error}`);
+      }
+    } catch (error) {
+      debugLog(`❌ Error removing pair: ${error}`);
+    }
+  };
+
   const onDragEnd = (result: any) => {
     // Disable drag-and-drop on mobile to prevent touch scrolling interference
     if (isMobile) return;
@@ -1382,6 +1417,7 @@ const PairsTable = () => {
                 <TableRow className="border-b dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                   <TableHead className="text-left w-[140px]">Symbol</TableHead>
                   <TableHead className="text-right w-[80px]">Price</TableHead>
+                  <TableHead className="text-center w-[80px]">Actions</TableHead>
                   {timeframes.map((tf) => (
                     <TableHead
                       key={tf}
@@ -1487,6 +1523,28 @@ const PairsTable = () => {
                             </TableCell>
                             <TableCell className="text-right pr-6">
                               {pair.price?.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-center w-[80px]">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removePair(pair.symbol);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Remove trading pair</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </TableCell>
                             {timeframes.map((tf) => (
                               <TableCell
