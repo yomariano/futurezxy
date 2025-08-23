@@ -74,24 +74,21 @@ export function PushNotificationSetup() {
 
   const testNotification = async () => {
     try {
-      const response = await fetch('/api/notifications/trigger', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: 'FutureZXY Push Notifications Enabled! 🎯',
-          body: 'You will now receive push notifications for WT1 and WT2 trading signals.',
-          tag: 'setup-test',
-          url: '/signals',
-        }),
+      const response = await fetch('/api/notifications/test', {
+        method: 'GET',
       });
 
-      if (!response.ok) {
-        console.error('Failed to send test notification');
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('Test notification sent successfully:', result);
+      } else {
+        console.error('Failed to send test notification:', result.error);
+        setError(result.error || 'Failed to send test notification');
       }
     } catch (error) {
       console.error('Error sending test notification:', error);
+      setError('Error sending test notification');
     }
   };
 
@@ -180,16 +177,26 @@ export function PushNotificationSetup() {
             )}
           </div>
         </div>
-        <div>
+        <div className="flex gap-2">
           {isSubscribed ? (
-            <Button 
-              onClick={handleUnsubscribe} 
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-            >
-              {isLoading ? 'Unsubscribing...' : 'Unsubscribe'}
-            </Button>
+            <>
+              <Button 
+                onClick={testNotification} 
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                Test Notification
+              </Button>
+              <Button 
+                onClick={handleUnsubscribe} 
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                {isLoading ? 'Unsubscribing...' : 'Unsubscribe'}
+              </Button>
+            </>
           ) : (
             <Button 
               onClick={handleSubscribe} 
