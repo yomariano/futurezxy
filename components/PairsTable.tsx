@@ -44,7 +44,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h";
+type Timeframe = "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
 
 // Update the signal types to include extreme states
 type SignalType =
@@ -411,7 +411,9 @@ const PairsTable = () => {
   const [previousPrices, setPreviousPrices] = useState<Record<string, number>>(
     {}
   );
-  const [timeframes, setTimeframes] = useState<Timeframe[]>([]);
+  const [timeframes, setTimeframes] = useState<Timeframe[]>([
+    "1m", "5m", "15m", "30m", "1h", "4h", "1d"
+  ]);
   const [crossSignals, setCrossSignals] = useState<CrossSignals[]>([]);
   const [sortByBuySignals, setSortByBuySignals] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -518,11 +520,12 @@ const PairsTable = () => {
     const signal = calculateSignal(data.wt1, settings);
     console.log("Calculated signal:", signal);
 
-    // Update timeframes if we receive a new one
+    // Update timeframes if we receive a new one (fallback for new timeframes)
     setTimeframes((current) => {
       if (!current.includes(data.timeframe as Timeframe)) {
+        debugLog(`📊 Adding new timeframe: ${data.timeframe}`);
         return [...current, data.timeframe as Timeframe].sort(
-          (a, b) => timeframeToMinutes(a) - timeframeToMinutes(b)
+          (a, b) => (timeframeOrder[a] || 999) - (timeframeOrder[b] || 999)
         );
       }
       return current;
