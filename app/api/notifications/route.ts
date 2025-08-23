@@ -7,11 +7,17 @@ function initializeWebPush() {
   const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
   const VAPID_EMAIL = process.env.VAPID_EMAIL;
 
+  console.log('🔑 Initializing WebPush with VAPID keys...');
+  console.log('📧 VAPID Email:', VAPID_EMAIL ? '✅ Set' : '❌ Missing');
+  console.log('🔓 Public Key:', VAPID_PUBLIC_KEY ? `✅ Set (${VAPID_PUBLIC_KEY.substring(0, 20)}...)` : '❌ Missing');
+  console.log('🔐 Private Key:', VAPID_PRIVATE_KEY ? '✅ Set (hidden)' : '❌ Missing');
+
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_EMAIL) {
     throw new Error('VAPID keys not configured. Please set VAPID environment variables.');
   }
 
   webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('✅ WebPush VAPID details configured successfully');
 }
 
 interface PushSubscriptionData {
@@ -125,11 +131,17 @@ async function handleSingleNotification(data: SendNotificationRequest) {
 async function handleBulkNotification(data: SendBulkNotificationRequest) {
   try {
     const { subscriptions, payload } = data;
+    console.log('📨 Sending bulk notifications...');
+    console.log(`📊 Subscriptions to notify: ${subscriptions.length}`);
+    console.log('📝 Payload:', payload);
+
     const results = [];
     const notificationPayload = JSON.stringify(payload);
 
     for (const subscription of subscriptions) {
       try {
+        console.log(`📤 Sending to: ${subscription.endpoint.substring(0, 50)}...`);
+        
         const pushSubscription = {
           endpoint: subscription.endpoint,
           keys: {
@@ -139,21 +151,25 @@ async function handleBulkNotification(data: SendBulkNotificationRequest) {
         };
 
         await webpush.sendNotification(pushSubscription, notificationPayload);
+        console.log(`✅ Notification sent successfully to ${subscription.endpoint.substring(0, 50)}...`);
+        
         results.push({
           endpoint: subscription.endpoint,
           success: true,
         });
       } catch (error) {
         console.error(
-          `Error sending notification to ${subscription.endpoint}:`,
+          `❌ Error sending notification to ${subscription.endpoint.substring(0, 50)}...:`,
           error
         );
 
         let shouldUnsubscribe = false;
         if (error && typeof error === "object" && "statusCode" in error) {
           const pushError = error as any;
+          console.log(`🚫 Push error status code: ${pushError.statusCode}`);
           if (pushError.statusCode === 410 || pushError.statusCode === 404) {
             shouldUnsubscribe = true;
+            console.log(`🗑️ Subscription should be removed (${pushError.statusCode})`);
           }
         }
 
@@ -169,6 +185,8 @@ async function handleBulkNotification(data: SendBulkNotificationRequest) {
     const successCount = results.filter((r) => r.success).length;
     const failureCount = results.length - successCount;
 
+    console.log(`📈 Results: ${successCount} success, ${failureCount} failed`);
+
     return NextResponse.json({
       success: true,
       message: `Sent ${successCount} notifications, ${failureCount} failed`,
@@ -180,7 +198,7 @@ async function handleBulkNotification(data: SendBulkNotificationRequest) {
       },
     });
   } catch (error) {
-    console.error("Error sending bulk notifications:", error);
+    console.error("❌ Error sending bulk notifications:", error);
     return NextResponse.json(
       {
         success: false,

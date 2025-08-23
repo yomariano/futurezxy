@@ -38,15 +38,30 @@ interface LegacyTriggerNotificationRequest {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('🚀 Notification trigger called with:', body);
 
     // Handle new direct notification format (for WT1/WT2 signals)
     if (body.title && body.body) {
+      console.log('📨 Processing direct notification format...');
       const notification: TriggerNotificationRequest = body;
-      await sendAppNotification(notification.title, notification.body, {
+      
+      console.log('📤 Calling sendAppNotification with:', {
+        title: notification.title,
+        body: notification.body,
+        options: {
+          url: notification.url || '/signals',
+          tag: notification.tag || 'wt-signal',
+          data: notification.data,
+        }
+      });
+
+      const result = await sendAppNotification(notification.title, notification.body, {
         url: notification.url || '/signals',
         tag: notification.tag || 'wt-signal',
         data: notification.data,
       });
+
+      console.log('✅ sendAppNotification completed');
       
       return NextResponse.json({
         success: true,

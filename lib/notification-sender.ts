@@ -25,23 +25,33 @@ export async function sendBulkNotification(
   };
 }> {
   try {
+    console.log('🔍 Fetching subscriptions for bulk notification...');
+    console.log('📝 Payload to send:', payload);
+
     // Get all subscriptions from the subscribe endpoint
-    const subscriptionsResponse = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      }/api/notifications/subscribe`,
-      {
-        method: "GET",
-      }
-    );
+    const subscriptionsUrl = `${
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    }/api/notifications/subscribe`;
+    
+    console.log('📡 Fetching from:', subscriptionsUrl);
+
+    const subscriptionsResponse = await fetch(subscriptionsUrl, {
+      method: "GET",
+    });
+
+    console.log('📊 Subscriptions response status:', subscriptionsResponse.status);
 
     if (!subscriptionsResponse.ok) {
+      const errorText = await subscriptionsResponse.text();
+      console.error('❌ Failed to fetch subscriptions:', errorText);
       throw new Error("Failed to fetch subscriptions");
     }
 
     const subscriptionsData = await subscriptionsResponse.json();
+    console.log('📋 Subscriptions data:', subscriptionsData);
 
     if (!subscriptionsData.success || subscriptionsData.count === 0) {
+      console.log('⚠️ No active subscriptions found');
       return {
         success: true,
         message: "No active subscriptions found",
