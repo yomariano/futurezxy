@@ -1170,7 +1170,7 @@ const PairsTable = () => {
   };
 
   return (
-    <div className="space-y-4 max-w-full">
+    <div className="space-y-4 w-full overflow-x-visible">
       {/* Controls Container - Now with max-width constraint */}
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-4 px-4 sm:px-6 md:px-0 max-w-[1200px] mx-auto">
         <div className="flex items-center space-x-2">
@@ -1248,9 +1248,21 @@ const PairsTable = () => {
         </div>
       )}
 
-      {/* Table Container - Now with horizontal scroll */}
-      <div className="overflow-x-auto">
-        <div className="min-w-full w-max max-w-none bg-background dark:bg-gray-900 rounded-lg">
+      {/* Mobile scroll hint */}
+      <div className="md:hidden text-xs text-gray-500 dark:text-gray-400 mb-2 px-4 flex items-center gap-2">
+        <span>←→ Swipe to view all timeframes</span>
+      </div>
+
+      {/* Table Container - Mobile-optimized horizontal scroll */}
+      <div className="overflow-x-auto overflow-y-visible touch-pan-x" style={{ 
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'rgba(156, 163, 175, 0.5) transparent'
+      }}>
+        <div className="min-w-full bg-background dark:bg-gray-900 rounded-lg" style={{ 
+          minWidth: 'max-content',
+          width: 'fit-content'
+        }}>
           <DragDropContext onDragEnd={onDragEnd}>
             <Table>
               <TableHeader>
