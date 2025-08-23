@@ -434,7 +434,9 @@ const showNotification = (symbol: string, message: string, signalType: 'buy' | '
         });
 
         notification.onclick = () => {
-          window.focus();
+          if (typeof window !== 'undefined') {
+            window.focus();
+          }
           notification.close();
         };
 
@@ -544,7 +546,9 @@ const testNotification = (playBellSound?: () => void) => {
 
         // Add click handler
         notification.onclick = () => {
-          window.focus();
+          if (typeof window !== 'undefined') {
+            window.focus();
+          }
           notification.close();
         };
 
@@ -922,12 +926,14 @@ const PairsTable = () => {
       debugLog("🔄 Environment URL:", envUrl);
       debugLog("🔄 Final WebSocket URL:", url);
       debugLog("🔄 Attempting WebSocket connection to:", url);
-      debugLog("🔄 Browser info:", {
-        userAgent: navigator.userAgent,
-        isSecureContext: window.isSecureContext,
-        location: window.location.origin,
-        protocol: window.location.protocol
-      });
+      if (typeof window !== 'undefined') {
+        debugLog("🔄 Browser info:", {
+          userAgent: navigator.userAgent,
+          isSecureContext: window.isSecureContext,
+          location: window.location.origin,
+          protocol: window.location.protocol
+        });
+      }
 
       // Close existing connection if any
       if (ws) {
@@ -1185,6 +1191,8 @@ const PairsTable = () => {
 
   // Detect mobile device
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
@@ -1197,6 +1205,8 @@ const PairsTable = () => {
 
   // Listen for pair addition events
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const onPairAdded = (event: CustomEvent) => {
       const newPair = event.detail;
       debugLog("🔔 Received pair addition event", newPair);
@@ -1278,9 +1288,11 @@ const PairsTable = () => {
         debugLog(`🗑️ Removed trading pair: ${symbol}`);
         
         // Dispatch custom event to notify other components
-        window.dispatchEvent(new CustomEvent('pairRemoved', { 
-          detail: { symbol } 
-        }));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('pairRemoved', { 
+            detail: { symbol } 
+          }));
+        }
       } else {
         debugLog(`❌ Failed to remove pair: ${data.error}`);
       }
