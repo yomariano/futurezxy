@@ -201,6 +201,12 @@ body {
     /* Force scrollbar to always show on mobile */
     overflow-x: scroll !important;
     -webkit-overflow-scrolling: touch !important;
+    /* Prevent touch callouts and selections that interfere with scrolling */
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    /* Ensure touch events work */
+    touch-action: pan-x !important;
   }
   
   .mobile-scroll-container::-webkit-scrollbar {

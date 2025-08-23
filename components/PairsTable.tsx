@@ -26,8 +26,6 @@ import {
   Bell,
   Pin,
   Settings,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import {
   Tooltip,
@@ -428,8 +426,7 @@ const PairsTable = () => {
   const [showDebugConsole, setShowDebugConsole] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Custom logging function that shows on screen
   const debugLog = useCallback((message: string, data?: any) => {
@@ -916,10 +913,6 @@ const PairsTable = () => {
         const maxScroll = scrollWidth - clientWidth;
         const progress = maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
         setScrollProgress(progress);
-        
-        // Update scroll button states
-        setCanScrollLeft(scrollLeft > 0);
-        setCanScrollRight(scrollLeft < maxScroll - 1);
       }
     };
 
@@ -935,18 +928,17 @@ const PairsTable = () => {
     }
   }, []);
 
-  // Scroll functions for mobile buttons
-  const scrollLeft = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
-    }
-  };
-
-  const scrollRight = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
-    }
-  };
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Add this helper function
   const getCrossSignal = (symbol: string, timeframe: Timeframe) => {
@@ -994,6 +986,9 @@ const PairsTable = () => {
 
   // Add this function to handle drag end
   const onDragEnd = (result: any) => {
+    // Disable drag-and-drop on mobile to prevent touch scrolling interference
+    if (isMobile) return;
+    
     if (!result.destination) return;
 
     const items = Array.from(pairs);
@@ -1294,39 +1289,17 @@ const PairsTable = () => {
         </div>
       )}
 
-      {/* Mobile scroll hint with progress and buttons */}
+      {/* Mobile scroll hint with progress */}
       <div className="md:hidden mb-2 px-4">
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
           <span>←→ Swipe to view all timeframes</span>
           <span>{Math.round(scrollProgress)}%</span>
         </div>
-        
-        {/* Progress bar with scroll buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={scrollLeft}
-            disabled={!canScrollLeft}
-            className="p-1 rounded bg-blue-500 text-white disabled:bg-gray-300 disabled:text-gray-500 disabled:opacity-50 flex-shrink-0"
-            aria-label="Scroll left"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          
-          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-150 ease-out"
-              style={{ width: `${scrollProgress}%` }}
-            />
-          </div>
-          
-          <button
-            onClick={scrollRight}
-            disabled={!canScrollRight}
-            className="p-1 rounded bg-blue-500 text-white disabled:bg-gray-300 disabled:text-gray-500 disabled:opacity-50 flex-shrink-0"
-            aria-label="Scroll right"
-          >
-            <ChevronRight size={16} />
-          </button>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+          <div 
+            className="bg-blue-500 h-1 rounded-full transition-all duration-150 ease-out"
+            style={{ width: `${scrollProgress}%` }}
+          />
         </div>
       </div>
 
@@ -1337,13 +1310,12 @@ const PairsTable = () => {
         style={{ 
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'auto',
-          scrollbarColor: 'rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3)',
-          overflowX: 'scroll'
+          scrollbarColor: 'rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3)'
         }}
       >
         <div className="min-w-full bg-background dark:bg-gray-900 rounded-lg" style={{ 
-          minWidth: 'max-content',
-          width: 'fit-content'
+          minWidth: '1200px', // Ensure table is wide enough to scroll on mobile
+          width: 'max-content'
         }}>
           <DragDropContext onDragEnd={onDragEnd}>
             <Table>
@@ -1372,6 +1344,7 @@ const PairsTable = () => {
                         key={pair.symbol}
                         draggableId={pair.symbol}
                         index={index}
+                        isDragDisabled={isMobile}
                       >
                         {(provided, snapshot) => (
                           <TableRow
