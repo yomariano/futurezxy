@@ -9,12 +9,9 @@ export default function AuthButton() {
   const supabase = createClientComponentClient()
 
   const handleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${location.origin}/auth/callback`
-      }
-    })
+    // 🚫🔐 AUTH BYPASSED - Direct redirect to signals page
+    console.log('🔓 Log in clicked - AUTH BYPASSED, redirecting to signals page');
+    router.push('/signals')
   }
 
   const handleSignOut = async () => {

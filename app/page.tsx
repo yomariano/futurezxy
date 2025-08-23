@@ -12,29 +12,9 @@ export default function Component() {
   const router = useRouter()
 
   const handleGetStarted = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (session) {
-      router.push('/signals')
-    } else {
-      // Get origin with SSR protection
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://signalstrading.app'
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        }
-      })
-      
-      if (error) {
-        console.error('Authentication error:', error.message)
-      }
-    }
+    // 🚫🔐 AUTH BYPASSED - Direct redirect to signals page
+    console.log('🔓 Get Started clicked - AUTH BYPASSED, redirecting to signals page');
+    router.push('/signals')
   }
 
   return (
@@ -171,7 +151,7 @@ export default function Component() {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full">Get Started</Button>
+                  <Button className="w-full" onClick={handleGetStarted}>Get Started</Button>
                 </CardFooter>
               </Card>
               <Card>
@@ -193,7 +173,7 @@ export default function Component() {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full">Upgrade to Pro</Button>
+                  <Button className="w-full" onClick={handleGetStarted}>Upgrade to Pro</Button>
                 </CardFooter>
               </Card>
               <Card>
@@ -216,7 +196,7 @@ export default function Component() {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full">Go Elite</Button>
+                  <Button className="w-full" onClick={handleGetStarted}>Go Elite</Button>
                 </CardFooter>
               </Card>
             </div>
