@@ -4,17 +4,25 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronRight, BarChart2, TrendingUp, AlertCircle, Zap, Lock, CheckCircle2, LineChart, Smartphone, BookOpen, Unlock, Crown, User } from 'lucide-react'
 import AuthButton from '@/components/AuthButton'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import BypassAuthButton from '@/components/BypassAuthButton'
 import { useRouter } from 'next/navigation'
 
 export default function Component() {
-  const supabase = createClientComponentClient()
   const router = useRouter()
 
-  const handleGetStarted = async () => {
-    // 🚫🔐 AUTH BYPASSED - Direct redirect to signals page
+  const handleGetStarted = () => {
+    // 🚫🔐 AUTH COMPLETELY BYPASSED - Direct redirect to signals page
     console.log('🔓 Get Started clicked - AUTH BYPASSED, redirecting to signals page');
-    router.push('/signals')
+    
+    // Multiple redirect methods to ensure it works
+    router.push('/signals');
+    
+    // Fallback: direct window location redirect
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.location.href = '/signals';
+      }, 100);
+    }
   }
 
   return (
@@ -40,9 +48,9 @@ export default function Component() {
           </div>
           <div className="flex items-center gap-4">
             <AuthButton />
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGetStarted}>
-              Get Started
-            </Button>
+            <BypassAuthButton className="bg-primary text-primary-foreground hover:bg-primary/90">
+              Get Started (No Auth)
+            </BypassAuthButton>
           </div>
         </div>
       </header>
@@ -59,10 +67,10 @@ export default function Component() {
                 </p>
               </div>
               <div className="space-x-4">
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGetStarted}>
-                  Get Started
+                <BypassAuthButton className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  Get Started (No Auth Required)
                   <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
+                </BypassAuthButton>
                 <Button variant="outline">Learn More</Button>
               </div>
             </div>

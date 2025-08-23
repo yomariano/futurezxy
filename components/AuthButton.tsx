@@ -1,28 +1,30 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { Button } from './ui/button'
 
 export default function AuthButton() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
 
-  const handleSignIn = async () => {
-    // 🚫🔐 AUTH BYPASSED - Direct redirect to signals page
+  const handleSignIn = () => {
+    // 🚫🔐 AUTH COMPLETELY BYPASSED - Direct redirect to signals page
     console.log('🔓 Log in clicked - AUTH BYPASSED, redirecting to signals page');
-    router.push('/signals')
+    
+    // Multiple redirect methods to ensure it works
+    router.push('/signals');
+    
+    // Fallback: direct window location redirect
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.location.href = '/signals';
+      }, 100);
+    }
   }
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut({ scope: 'local' })
-      router.refresh()
-    } catch (error) {
-      console.warn('Sign out error:', error)
-      // Clear local session even if server logout fails
-      router.refresh()
-    }
+  const handleSignOut = () => {
+    // 🚫🔐 AUTH BYPASSED - No sign out needed, just redirect to home
+    console.log('🔓 Sign out clicked - AUTH BYPASSED, redirecting to home');
+    router.push('/');
   }
 
   return (
@@ -32,7 +34,7 @@ export default function AuthButton() {
         className="text-base font-bold"
         onClick={handleSignIn}
       >
-        Log in
+        Log in (Auth Bypassed)
       </Button>
     </div>
   )
