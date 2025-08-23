@@ -753,7 +753,7 @@ const PairsTable = () => {
     // Update timeframes if we receive a new one (fallback for new timeframes)
     setTimeframes((current) => {
       if (!current.includes(data.timeframe as Timeframe)) {
-        debugLog(`📊 Adding new timeframe: ${data.timeframe}`);
+        // Adding new timeframe
         return [...current, data.timeframe as Timeframe].sort(
           (a, b) => (timeframeOrder[a] || 999) - (timeframeOrder[b] || 999)
         );
@@ -796,7 +796,7 @@ const PairsTable = () => {
         const signalToReport = isNewGreenSignal ? signal : wt2Signal;
         const notificationMessage = `🎯 ${triggerType} ${signalToReport.toUpperCase()} signal on ${data.timeframe} (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`;
         
-        debugLog(`🔔 Triggering notifications for ${data.symbol} on ${data.timeframe} - ${triggerType} turned green`);
+        // Triggering notifications
         
         // Play sound notification
         playBell?.();
@@ -980,50 +980,38 @@ const PairsTable = () => {
       
       // Fix common misconfigurations - ensure we use WSS through proxy
       if (url.includes(":8081") || url === "ws://api.signalstrading.app") {
-        debugLog("🔧 Fixing URL to use proxy without port");
+
         url = "wss://api.signalstrading.app";
       }
       
       // Ensure we use WSS through the proxy (standard port 443)
       if (url.includes("api.signalstrading.app") && url.startsWith("ws://")) {
-        debugLog("🔧 Upgrading to secure WSS through proxy");
+
         url = "wss://api.signalstrading.app";
       }
       
       // Ensure we use WSS protocol for security through proxy
       if (url.startsWith("ws://") && url.includes("signalstrading.app")) {
-        debugLog("🔧 Converting WS to WSS through proxy");
+
         url = "wss://api.signalstrading.app";
       }
       
-      debugLog("🔄 Environment URL:", envUrl);
-      debugLog("🔄 Final WebSocket URL:", url);
-      debugLog("🔄 Attempting WebSocket connection to:", url);
-      if (typeof window !== 'undefined') {
-        debugLog("🔄 Browser info:", {
-          userAgent: navigator.userAgent,
-          isSecureContext: window.isSecureContext,
-          location: window.location.origin,
-          protocol: window.location.protocol
-        });
-      }
+
+
+
+      // Browser info check removed
 
       // Close existing connection if any
       if (ws) {
-        debugLog("🔌 Closing existing connection");
+
         ws.close();
       }
 
       const testWs = new WebSocket(url);
 
       testWs.onopen = () => {
-        debugLog("🟢 WebSocket connection established successfully");
-        debugLog("🟢 Connection details:", {
-          readyState: testWs.readyState,
-          url: testWs.url,
-          protocol: testWs.protocol,
-          extensions: testWs.extensions
-        });
+
+        // Connection established
         
         // Reset reconnection counter on successful connection
         reconnectAttempts.current = 0;
@@ -1038,17 +1026,11 @@ const PairsTable = () => {
           symbols: symbols
         };
         testWs.send(JSON.stringify(subscribeMessage));
-        debugLog("📤 Sent subscription message for symbols:", symbols);
+
       };
 
       testWs.onclose = (event) => {
-        debugLog("🔴 WebSocket connection closed:", {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-          timestamp: new Date().toISOString(),
-          attempts: reconnectAttempts.current
-        });
+        // WebSocket connection closed
         
         setIsConnected(false);
         setIsLoading(false);
@@ -1071,30 +1053,19 @@ const PairsTable = () => {
           // Exponential backoff: 2^attempts * 1000ms (1s, 2s, 4s, 8s, 16s)
           const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000);
           
-          debugLog(`🔄 Scheduling reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts.current} in ${delay}ms...`);
+
           
           reconnectTimeoutId.current = setTimeout(() => {
-            debugLog(`🔄 Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts.current})...`);
+
             connectWebSocket();
           }, delay);
         } else {
-          debugLog('❌ Not reconnecting:', {
-            wasClean: event.wasClean,
-            attempts: reconnectAttempts.current,
-            maxAttempts: maxReconnectAttempts.current,
-            code: event.code
-          });
+          // Not reconnecting
         }
       };
 
       testWs.onerror = (error) => {
-        debugLog("❌ WebSocket error occurred:", {
-          error: error.toString(),
-          timestamp: new Date().toISOString(),
-          readyState: testWs.readyState,
-          readyStateString: ["CONNECTING", "OPEN", "CLOSING", "CLOSED"][testWs.readyState],
-          url: url
-        });
+        // WebSocket error occurred
         setIsLoading(false);
         setIsConnected(false);
         
@@ -1102,18 +1073,18 @@ const PairsTable = () => {
         if (reconnectAttempts.current < maxReconnectAttempts.current) {
           reconnectAttempts.current++;
           const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 10000);
-          debugLog(`🔄 Scheduling error recovery reconnection in ${delay}ms...`);
-          debugLog("🔄 Will try alternative URL if this attempt fails");
+
+
           
           setTimeout(() => {
-            debugLog("🔄 Attempting error recovery reconnection...");
+
             connectWebSocket();
           }, delay);
         } else {
-          debugLog("❌ Max reconnection attempts reached. Please refresh page or check network.");
+
           // Try one more time with the direct port connection
           if (!url.includes(":8081")) {
-            debugLog("🔄 Trying direct port connection as last resort");
+
             setTimeout(() => connectWebSocket(), 5000);
           }
         }
@@ -1122,26 +1093,26 @@ const PairsTable = () => {
       testWs.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          debugLog('📨 Received message type:', message.type);
+
           
           if (message.type === 'connection') {
-            debugLog('🔗 Connection established:', message.message);
+
             // Handle initial data if provided
             if (message.data) {
-              debugLog('📋 Processing initial trading data');
+
               processTraidingData(message.data);
             }
           } else if (message.type === 'trading_data') {
-            debugLog('📊 Processing trading data update');
+
             processTraidingData(message.data);
           } else if (message.type === 'indicators') {
             // Legacy support
             handleIndicatorMessage(message as IndicatorMessage);
           } else {
-            debugLog('🔍 Unknown message type:', message.type);
+
           }
         } catch (error) {
-          debugLog('😵 Error parsing WebSocket message:', error);
+
         }
       };
       
@@ -1168,12 +1139,12 @@ const PairsTable = () => {
   // Load pairs from API
   const loadPairs = useCallback(async () => {
     try {
-      debugLog("📡 Loading pairs from API...");
+
       const response = await fetch('/api/pairs');
       const data = await response.json();
       
       if (data.success && data.pairs) {
-        debugLog(`✅ Loaded ${data.pairs.length} pairs from API`);
+
         // Only update pairs that aren't already present to avoid losing WebSocket data
         setPairs(currentPairs => {
           const apiPairs = data.pairs.map((apiPair: any) => {
@@ -1188,13 +1159,13 @@ const PairsTable = () => {
         });
       }
     } catch (error) {
-      debugLog("❌ Failed to load pairs from API", error);
+
     }
-  }, [debugLog]);
+
 
   // Handle new pair added
   const handlePairAdded = useCallback((newPair: any) => {
-    debugLog("➕ New pair added", newPair);
+
     setPairs(currentPairs => {
       const exists = currentPairs.find(p => p.symbol === newPair.symbol);
       if (!exists) {
@@ -1206,13 +1177,13 @@ const PairsTable = () => {
       }
       return currentPairs;
     });
-  }, [debugLog]);
+
 
   useEffect(() => {
     if (connectionAttempted.current) return;
     connectionAttempted.current = true;
 
-    debugLog("🚀 Component mounted, loading pairs and initializing WebSocket...");
+
     loadPairs();
     connectWebSocket();
 
@@ -1282,7 +1253,7 @@ const PairsTable = () => {
     
     const onPairAdded = (event: CustomEvent) => {
       const newPair = event.detail;
-      debugLog("🔔 Received pair addition event", newPair);
+
       handlePairAdded(newPair);
     };
 
@@ -1358,7 +1329,7 @@ const PairsTable = () => {
           localStorage.setItem(PINNED_PAIRS_KEY, JSON.stringify(pinnedPairs));
         }
 
-        debugLog(`🗑️ Removed trading pair: ${symbol}`);
+
         
         // Dispatch custom event to notify other components
         if (typeof window !== 'undefined') {
@@ -1367,10 +1338,10 @@ const PairsTable = () => {
           }));
         }
       } else {
-        debugLog(`❌ Failed to remove pair: ${data.error}`);
+
       }
     } catch (error) {
-      debugLog(`❌ Error removing pair: ${error}`);
+
     }
   };
 
