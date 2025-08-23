@@ -17,10 +17,13 @@ export default function Component() {
     if (session) {
       router.push('/signals')
     } else {
+      // Get origin with SSR protection
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://signalstrading.app'
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

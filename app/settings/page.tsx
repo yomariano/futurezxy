@@ -112,6 +112,9 @@ const SettingsPage = () => {
 
   // Add new useEffect for notification settings
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
     // Load notification settings from localStorage
     const savedSettings = localStorage.getItem(NOTIFICATION_SETTINGS_KEY)
     if (savedSettings) {
@@ -138,7 +141,7 @@ const SettingsPage = () => {
   }, [])
 
   const requestNotificationPermission = async () => {
-    if ('Notification' in window) {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
       const permission = await Notification.requestPermission()
       setNotificationsEnabled(permission === 'granted')
     }
