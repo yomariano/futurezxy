@@ -474,6 +474,67 @@ const createInAppNotification = (symbol: string, message: string, type: 'buy' | 
   console.log("📱 In-app notification created:", notification);
 };
 
+// Get current push subscription
+const getSubscription = async (): Promise<PushSubscription | null> => {
+  if (!('serviceWorker' in navigator)) return null;
+  
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) return null;
+    
+    return await registration.pushManager.getSubscription();
+  } catch (error) {
+    console.error("Error getting subscription:", error);
+    return null;
+  }
+};
+
+// VAPID push notification subscription
+const subscribeToPushNotifications = async (registration: ServiceWorkerRegistration) => {
+  try {
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    
+    if (!vapidPublicKey) {
+      console.warn("VAPID public key not found");
+      return;
+    }
+
+    console.log("Subscribing to push notifications with VAPID key...");
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: vapidPublicKey,
+    });
+
+    console.log("Push subscription:", subscription);
+
+    // Send subscription to server
+    const response = await fetch('/api/notifications/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        subscription,
+        userId: 'trading-user', // In production, use actual user ID
+        symbols: pairs.map(p => p.symbol), // Subscribe to all current pairs
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log("✅ Push subscription saved successfully");
+      debugLog("🔔 VAPID push notifications enabled");
+    } else {
+      console.error("Failed to save subscription:", result.error);
+    }
+
+  } catch (error) {
+    console.error("Error subscribing to push notifications:", error);
+  }
+};
+
 // Update the testNotification function
 const testNotification = (playBellSound?: () => void) => {
   if ("Notification" in window) {
@@ -624,19 +685,34 @@ const PairsTable = () => {
 
   // Add this useEffect to request notification permission and initialize audio on component mount
   useEffect(() => {
-    if ("Notification" in window) {
-      // Request permission on component mount
-      if (Notification.permission === "default") {
-        Notification.requestPermission().then((permission) => {
-          console.log("Notification permission status:", permission);
-        });
-      }
+    const initNotifications = async () => {
+      if ("Notification" in window && "serviceWorker" in navigator) {
+        try {
+          // Register service worker
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log('Service Worker registered:', registration);
 
-      // Log current permission status
-      console.log("Current notification permission:", Notification.permission);
-    } else {
-      console.log("Notifications not supported in this browser");
-    }
+          // Request permission
+          if (Notification.permission === "default") {
+            const permission = await Notification.requestPermission();
+            console.log("Notification permission status:", permission);
+          }
+
+          // Subscribe to push notifications if permission granted
+          if (Notification.permission === "granted") {
+            await subscribeToPushNotifications(registration);
+          }
+
+          console.log("Current notification permission:", Notification.permission);
+        } catch (error) {
+          console.error("Error initializing notifications:", error);
+        }
+      } else {
+        console.log("Notifications or Service Worker not supported in this browser");
+      }
+    };
+
+    initNotifications();
 
     // Initialize audio context on first user interaction
     const handleUserInteraction = () => {
@@ -1516,11 +1592,35 @@ const PairsTable = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
+            onClick={async () => {
               initAudioContext();
-              createInAppNotification("TEST", "🔊 Testing notification system - Sound + Visual", "info");
+              createInAppNotification("TEST", "🔊 Testing complete notification system - Sound + Visual + Push", "info");
               playNotificationSound();
               debugLog("🧪 Test notification triggered");
+              
+              // Test VAPID push notification
+              try {
+                const response = await fetch('/api/notifications/push', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    subscription: await getSubscription(),
+                    title: "🧪 Test Alert - VAPID Push",
+                    body: "This is a test of the VAPID push notification system",
+                    tag: "test-notification",
+                    url: "/signals"
+                  }),
+                });
+                
+                if (response.ok) {
+                  debugLog("✅ VAPID push notification sent");
+                } else {
+                  debugLog("⚠️ VAPID push failed - using fallback notifications");
+                }
+              } catch (error) {
+                console.error("VAPID test failed:", error);
+                debugLog("⚠️ VAPID test failed - fallback notifications active");
+              }
             }}
             className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-800/30"
           >
