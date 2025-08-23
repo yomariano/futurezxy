@@ -420,6 +420,24 @@ const PairsTable = () => {
   const [playBell, setPlayBell] = useState<(() => void) | null>(null);
   const [settings, setSettings] = useState<WaveTrendSettings>(DEFAULT_SETTINGS);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebugConsole, setShowDebugConsole] = useState(true);
+
+  // Custom logging function that shows on screen
+  const debugLog = useCallback((message: string, data?: any) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = data 
+      ? `[${timestamp}] ${message} ${JSON.stringify(data, null, 2)}`
+      : `[${timestamp}] ${message}`;
+    
+    console.log(message, data); // Still log to browser console
+    setDebugLogs(prev => [...prev.slice(-19), logEntry]); // Keep last 20 logs
+  }, []);
+
+  // Initialize with a welcome message
+  useEffect(() => {
+    debugLog("🔧 Debug console initialized - ready for WebSocket debugging!");
+  }, [debugLog]);
 
   // Load saved order on mount
   useEffect(() => {
@@ -687,10 +705,10 @@ const PairsTable = () => {
         url = url.replace("ws://", "wss://");
       }
       
-      console.log("🔄 Environment URL:", envUrl);
-      console.log("🔄 Final WebSocket URL:", url);
-      console.log("🔄 Attempting WebSocket connection to:", url);
-      console.log("🔄 Browser info:", {
+      debugLog("🔄 Environment URL:", envUrl);
+      debugLog("🔄 Final WebSocket URL:", url);
+      debugLog("🔄 Attempting WebSocket connection to:", url);
+      debugLog("🔄 Browser info:", {
         userAgent: navigator.userAgent,
         isSecureContext: window.isSecureContext,
         location: window.location.origin,
@@ -699,15 +717,15 @@ const PairsTable = () => {
 
       // Close existing connection if any
       if (ws) {
-        console.log("🔌 Closing existing connection");
+        debugLog("🔌 Closing existing connection");
         ws.close();
       }
 
       const testWs = new WebSocket(url);
 
       testWs.onopen = () => {
-        console.log("🟢 WebSocket connection established successfully");
-        console.log("🟢 Connection details:", {
+        debugLog("🟢 WebSocket connection established successfully");
+        debugLog("🟢 Connection details:", {
           readyState: testWs.readyState,
           url: testWs.url,
           protocol: testWs.protocol,
@@ -727,11 +745,11 @@ const PairsTable = () => {
           symbols: symbols
         };
         testWs.send(JSON.stringify(subscribeMessage));
-        console.log("📤 Sent subscription message for symbols:", symbols);
+        debugLog("📤 Sent subscription message for symbols:", symbols);
       };
 
       testWs.onclose = (event) => {
-        console.log("🔴 WebSocket connection closed:", {
+        debugLog("🔴 WebSocket connection closed:", {
           code: event.code,
           reason: event.reason,
           wasClean: event.wasClean,
@@ -760,14 +778,14 @@ const PairsTable = () => {
           // Exponential backoff: 2^attempts * 1000ms (1s, 2s, 4s, 8s, 16s)
           const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000);
           
-          console.log(`🔄 Scheduling reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts.current} in ${delay}ms...`);
+          debugLog(`🔄 Scheduling reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts.current} in ${delay}ms...`);
           
           reconnectTimeoutId.current = setTimeout(() => {
-            console.log(`🔄 Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts.current})...`);
+            debugLog(`🔄 Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts.current})...`);
             connectWebSocket();
           }, delay);
         } else {
-          console.log('❌ Not reconnecting:', {
+          debugLog('❌ Not reconnecting:', {
             wasClean: event.wasClean,
             attempts: reconnectAttempts.current,
             maxAttempts: maxReconnectAttempts.current,
@@ -777,8 +795,8 @@ const PairsTable = () => {
       };
 
       testWs.onerror = (error) => {
-        console.error("❌ WebSocket error occurred:", {
-          error: error,
+        debugLog("❌ WebSocket error occurred:", {
+          error: error.toString(),
           timestamp: new Date().toISOString(),
           readyState: testWs.readyState,
           readyStateString: ["CONNECTING", "OPEN", "CLOSING", "CLOSED"][testWs.readyState],
@@ -791,18 +809,18 @@ const PairsTable = () => {
         if (reconnectAttempts.current < maxReconnectAttempts.current) {
           reconnectAttempts.current++;
           const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 10000);
-          console.log(`🔄 Scheduling error recovery reconnection in ${delay}ms...`);
-          console.log("🔄 Will try alternative URL if this attempt fails");
+          debugLog(`🔄 Scheduling error recovery reconnection in ${delay}ms...`);
+          debugLog("🔄 Will try alternative URL if this attempt fails");
           
           setTimeout(() => {
-            console.log("🔄 Attempting error recovery reconnection...");
+            debugLog("🔄 Attempting error recovery reconnection...");
             connectWebSocket();
           }, delay);
         } else {
-          console.log("❌ Max reconnection attempts reached. Please refresh page or check network.");
+          debugLog("❌ Max reconnection attempts reached. Please refresh page or check network.");
           // Try one more time with the direct port connection
           if (!url.includes(":8081")) {
-            console.log("🔄 Trying direct port connection as last resort");
+            debugLog("🔄 Trying direct port connection as last resort");
             setTimeout(() => connectWebSocket(), 5000);
           }
         }
@@ -811,26 +829,26 @@ const PairsTable = () => {
       testWs.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('📨 Received message type:', message.type);
+          debugLog('📨 Received message type:', message.type);
           
           if (message.type === 'connection') {
-            console.log('🔗 Connection established:', message.message);
+            debugLog('🔗 Connection established:', message.message);
             // Handle initial data if provided
             if (message.data) {
-              console.log('📋 Processing initial trading data');
+              debugLog('📋 Processing initial trading data');
               processTraidingData(message.data);
             }
           } else if (message.type === 'trading_data') {
-            console.log('📊 Processing trading data update');
+            debugLog('📊 Processing trading data update');
             processTraidingData(message.data);
           } else if (message.type === 'indicators') {
             // Legacy support
             handleIndicatorMessage(message as IndicatorMessage);
           } else {
-            console.log('🔍 Unknown message type:', message.type);
+            debugLog('🔍 Unknown message type:', message.type);
           }
         } catch (error) {
-          console.error('😵 Error parsing WebSocket message:', error);
+          debugLog('😵 Error parsing WebSocket message:', error);
         }
       };
       
@@ -858,6 +876,7 @@ const PairsTable = () => {
     if (connectionAttempted.current) return;
     connectionAttempted.current = true;
 
+    debugLog("🚀 Component mounted, initializing WebSocket connection...");
     connectWebSocket();
 
     // Cleanup function
@@ -1181,8 +1200,53 @@ const PairsTable = () => {
           >
             <Settings className="h-4 w-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDebugConsole(!showDebugConsole)}
+            className="flex-shrink-0"
+          >
+            {showDebugConsole ? "Hide Debug" : "Show Debug"}
+          </Button>
         </div>
       </div>
+
+      {/* Debug Console */}
+      {showDebugConsole && (
+        <div className="mb-4 p-4 bg-gray-900 text-green-400 rounded-lg font-mono text-xs max-h-80 overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-green-300 font-bold">WebSocket Debug Console</h3>
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                isConnected ? "bg-green-500" : "bg-red-500"
+              )}></div>
+              <span className="text-xs">
+                {isConnected ? "Connected" : isLoading ? "Connecting..." : "Disconnected"}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDebugLogs([])}
+                className="text-xs h-6 px-2 text-gray-400 hover:text-white"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {debugLogs.length === 0 ? (
+              <div className="text-gray-500">No debug logs yet...</div>
+            ) : (
+              debugLogs.map((log, index) => (
+                <div key={index} className="break-words">
+                  {log}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Table Container - Now with horizontal scroll */}
       <div className="overflow-x-auto">
