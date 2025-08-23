@@ -761,27 +761,41 @@ const PairsTable = () => {
       const existingPair = currentPairs.find((p) => p.symbol === data.symbol);
       const previousSignal = existingPair?.signals[data.timeframe as Timeframe];
 
-      // Check if this is a new buy signal
-      const isNewBuySignal =
-        (signal === "buy" ||
-          signal === "extreme-buy" ||
-          signal === "near-buy") &&
-        previousSignal !== signal;
+      // Check if this is a new buy signal (green signal)
+      const isGreenSignal = signal === "buy" || signal === "extreme-buy" || signal === "near-buy";
+      const wasGreenSignal = previousSignal === "buy" || previousSignal === "extreme-buy" || previousSignal === "near-buy";
+      const isNewGreenSignal = isGreenSignal && !wasGreenSignal;
 
-      // If it's a new buy signal on 1m timeframe, trigger notification
+      // Calculate WT2 signal to check if either WT1 or WT2 turned green
+      const wt2Signal = calculateSignal(data.wt2, settings);
+      const isWt2GreenSignal = wt2Signal === "buy" || wt2Signal === "extreme-buy" || wt2Signal === "near-buy";
+      
+      // Get previous WT2 signal if available
+      const previousWt2Signal = existingPair?.indicators[data.timeframe as Timeframe] 
+        ? calculateSignal(existingPair.indicators[data.timeframe as Timeframe].wt2, settings)
+        : null;
+      const wasWt2GreenSignal = previousWt2Signal === "buy" || previousWt2Signal === "extreme-buy" || previousWt2Signal === "near-buy";
+      const isNewWt2GreenSignal = isWt2GreenSignal && !wasWt2GreenSignal;
+
+      // Trigger notification if on 1m or 5m timeframe and either WT1 or WT2 turns green
       if (
-        data.timeframe === "1m" &&
-        isNewBuySignal &&
+        (data.timeframe === "1m" || data.timeframe === "5m") &&
+        (isNewGreenSignal || isNewWt2GreenSignal) &&
         notificationSettings[data.symbol]
       ) {
-        console.log("Triggering notification for:", data.symbol);
+        const triggerType = isNewGreenSignal && isNewWt2GreenSignal 
+          ? "Both WT1 & WT2" 
+          : isNewGreenSignal 
+            ? "WT1" 
+            : "WT2";
+        const signalToReport = isNewGreenSignal ? signal : wt2Signal;
+        
+        debugLog(`🔔 Triggering sound notification for ${data.symbol} on ${data.timeframe} - ${triggerType} turned green`);
         playBell?.();
         showNotification(
           data.symbol,
-          `New ${signal.toLowerCase()} signal detected (WT1: ${data.wt1.toFixed(
-            2
-          )}, WT2: ${data.wt2.toFixed(2)})`,
-          signal.includes('buy') ? 'buy' : 'sell'
+          `🎯 ${triggerType} ${signalToReport.toUpperCase()} signal on ${data.timeframe} (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`,
+          'buy'
         );
       }
 
