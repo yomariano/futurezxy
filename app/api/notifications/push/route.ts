@@ -1,12 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import webpush from 'web-push';
 
-// Configure VAPID details
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_EMAIL}`,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// Configure VAPID details inside functions to ensure env vars are loaded
+const configureVAPID = () => {
+  const email = process.env.VAPID_EMAIL || 'noreply@signalstrading.app';
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc';
+  const privateKey = process.env.VAPID_PRIVATE_KEY || '961o30M51vXuJYD_IZcB7MhuMtvs8-b1TWsdVy7qaEo';
+
+  console.log('Configuring VAPID with:');
+  console.log('- Email:', email);
+  console.log('- Public key length:', publicKey?.length);
+  console.log('- Private key length:', privateKey?.length);
+  console.log('- Public key (first 20 chars):', publicKey?.substring(0, 20) + '...');
+  console.log('- Private key (first 10 chars):', privateKey?.substring(0, 10) + '...');
+
+  // Test key decoding
+  try {
+    const publicDecoded = Buffer.from(publicKey, 'base64url');
+    const privateDecoded = Buffer.from(privateKey, 'base64url');
+    console.log('- Decoded public key length:', publicDecoded.length, 'bytes');
+    console.log('- Decoded private key length:', privateDecoded.length, 'bytes');
+    
+    if (privateDecoded.length !== 32) {
+      throw new Error(`Private key is ${privateDecoded.length} bytes, should be 32 bytes`);
+    }
+  } catch (decodeError) {
+    console.error('Key decoding error:', decodeError);
+    throw decodeError;
+  }
+
+  webpush.setVapidDetails(`mailto:${email}`, publicKey, privateKey);
+  console.log('✅ VAPID configured successfully');
+};
 
 interface PushNotificationRequest {
   subscription: {
@@ -27,6 +52,9 @@ interface PushNotificationRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Configure VAPID before processing the request
+    configureVAPID();
+    
     const body: PushNotificationRequest = await request.json();
     
     if (!body.subscription) {
@@ -96,8 +124,17 @@ export async function POST(request: NextRequest) {
 
 // Get VAPID public key for client-side subscription
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-  });
+  try {
+    configureVAPID();
+    return NextResponse.json({
+      success: true,
+      publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    });
+  } catch (error) {
+    console.error('Error in GET /api/notifications/push:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'VAPID configuration failed'
+    }, { status: 500 });
+  }
 }
