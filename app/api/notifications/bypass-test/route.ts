@@ -14,7 +14,7 @@ export async function GET() {
         privateKey: process.env.VAPID_PRIVATE_KEY ? 'Present' : 'Missing', 
         email: process.env.VAPID_EMAIL || 'Missing',
       },
-      testNotificationTrigger: null,
+      testNotificationTrigger: null as any,
     };
 
     // Try to trigger a test notification without any auth
