@@ -9,20 +9,90 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Plus } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Plus, Loader2, Check, AlertCircle } from "lucide-react"
 import { useState } from "react"
 
-export default function AddPairDialog() {
-  const [open, setOpen] = useState(false)
+interface AddPairDialogProps {
+  onPairAdded?: (pair: any) => void;
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
+export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [symbol, setSymbol] = useState("")
+  const [exchange, setExchange] = useState("binance")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle pair addition logic here
-    setOpen(false)
+    
+    if (!symbol.trim()) {
+      setError("Please enter a trading pair symbol")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/pairs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol: symbol.trim(),
+          exchange,
+          enabled: true,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccess(data.message || 'Pair added successfully!')
+        setSymbol("")
+        onPairAdded?.(data.pair)
+        
+        // Dispatch custom event for other components to listen
+        window.dispatchEvent(new CustomEvent('pairAdded', { 
+          detail: data.pair 
+        }));
+        
+        // Close dialog after a short delay to show success message
+        setTimeout(() => {
+          setOpen(false)
+          setSuccess(null)
+        }, 1500)
+      } else {
+        setError(data.error || 'Failed to add pair')
+      }
+    } catch (err) {
+      setError('Network error. Please try again.')
+      console.error('Error adding pair:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!loading) {
+      setOpen(newOpen)
+      if (!newOpen) {
+        // Reset form when closing
+        setSymbol("")
+        setExchange("binance")
+        setError(null)
+        setSuccess(null)
+      }
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
@@ -33,19 +103,56 @@ export default function AddPairDialog() {
         <DialogHeader>
           <DialogTitle>Add New Trading Pair</DialogTitle>
         </DialogHeader>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="pair" className="text-sm font-medium">
-              Trading Pair
-            </label>
+            <Label htmlFor="symbol">Trading Pair Symbol</Label>
             <Input
-              id="pair"
-              placeholder="Enter trading pair (e.g., BTC/USDT)"
+              id="symbol"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              placeholder="e.g., BTCUSDT, ETHUSDT"
               required
+              disabled={loading}
             />
+            <p className="text-xs text-muted-foreground">
+              Enter symbol without separators (e.g., BTCUSDT not BTC/USDT)
+            </p>
           </div>
-          <Button type="submit" className="w-full">
-            Add Pair
+
+          <div className="space-y-2">
+            <Label htmlFor="exchange">Exchange</Label>
+            <select
+              id="exchange"
+              value={exchange}
+              onChange={(e) => setExchange(e.target.value)}
+              disabled={loading}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="binance">Binance</option>
+              <option value="coinbase">Coinbase</option>
+              <option value="kraken">Kraken</option>
+              <option value="bybit">Bybit</option>
+            </select>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+              <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {loading ? "Adding Pair..." : "Add Pair"}
           </Button>
         </form>
       </DialogContent>

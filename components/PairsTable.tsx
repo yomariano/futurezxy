@@ -875,11 +875,55 @@ const PairsTable = () => {
     }
   };
 
+  // Load pairs from API
+  const loadPairs = useCallback(async () => {
+    try {
+      debugLog("📡 Loading pairs from API...");
+      const response = await fetch('/api/pairs');
+      const data = await response.json();
+      
+      if (data.success && data.pairs) {
+        debugLog(`✅ Loaded ${data.pairs.length} pairs from API`);
+        // Only update pairs that aren't already present to avoid losing WebSocket data
+        setPairs(currentPairs => {
+          const apiPairs = data.pairs.map((apiPair: any) => {
+            const existingPair = currentPairs.find(p => p.symbol === apiPair.symbol);
+            return existingPair || {
+              ...apiPair,
+              indicators: {},
+              signals: {}
+            };
+          });
+          return apiPairs;
+        });
+      }
+    } catch (error) {
+      debugLog("❌ Failed to load pairs from API", error);
+    }
+  }, [debugLog]);
+
+  // Handle new pair added
+  const handlePairAdded = useCallback((newPair: any) => {
+    debugLog("➕ New pair added", newPair);
+    setPairs(currentPairs => {
+      const exists = currentPairs.find(p => p.symbol === newPair.symbol);
+      if (!exists) {
+        return [...currentPairs, {
+          ...newPair,
+          indicators: {},
+          signals: {}
+        }];
+      }
+      return currentPairs;
+    });
+  }, [debugLog]);
+
   useEffect(() => {
     if (connectionAttempted.current) return;
     connectionAttempted.current = true;
 
-    debugLog("🚀 Component mounted, initializing WebSocket connection...");
+    debugLog("🚀 Component mounted, loading pairs and initializing WebSocket...");
+    loadPairs();
     connectWebSocket();
 
     // Cleanup function
@@ -939,6 +983,21 @@ const PairsTable = () => {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Listen for pair addition events
+  useEffect(() => {
+    const onPairAdded = (event: CustomEvent) => {
+      const newPair = event.detail;
+      debugLog("🔔 Received pair addition event", newPair);
+      handlePairAdded(newPair);
+    };
+
+    window.addEventListener('pairAdded', onPairAdded as EventListener);
+    
+    return () => {
+      window.removeEventListener('pairAdded', onPairAdded as EventListener);
+    };
+  }, [handlePairAdded]);
 
   // Add this helper function
   const getCrossSignal = (symbol: string, timeframe: Timeframe) => {
