@@ -82,18 +82,15 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// GET /api/notifications/subscribe - Get all subscriptions (for testing)
+// GET /api/notifications/subscribe - Get all subscriptions (for bulk notifications)
 export async function GET() {
   try {
-    const allSubscriptions = Array.from(subscriptions.entries()).map(
-      ([key, sub]) => ({
-        key,
+    const allSubscriptions = Array.from(subscriptions.values())
+      .filter(sub => sub.isActive)
+      .map(sub => ({
         endpoint: sub.endpoint,
-        userId: sub.userId,
-        createdAt: sub.createdAt,
-        isActive: sub.isActive,
-      })
-    );
+        keys: sub.keys,
+      }));
 
     return NextResponse.json({
       success: true,

@@ -14,6 +14,15 @@ interface TradingSignal {
 }
 
 interface TriggerNotificationRequest {
+  type?: "trading_signal" | "app_notification";
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+  data?: Record<string, any>;
+}
+
+interface LegacyTriggerNotificationRequest {
   type: "trading_signal" | "app_notification";
   data:
     | TradingSignal
@@ -28,22 +37,40 @@ interface TriggerNotificationRequest {
 // POST /api/notifications/trigger - Trigger specific types of notifications
 export async function POST(request: NextRequest) {
   try {
-    const body: TriggerNotificationRequest = await request.json();
+    const body = await request.json();
 
-    if (!body.type || !body.data) {
+    // Handle new direct notification format (for WT1/WT2 signals)
+    if (body.title && body.body) {
+      const notification: TriggerNotificationRequest = body;
+      await sendAppNotification(notification.title, notification.body, {
+        url: notification.url || '/signals',
+        tag: notification.tag || 'wt-signal',
+        data: notification.data,
+      });
+      
+      return NextResponse.json({
+        success: true,
+        message: "WT1/WT2 notification sent successfully",
+      });
+    }
+
+    // Handle legacy format
+    const legacyBody: LegacyTriggerNotificationRequest = body;
+    
+    if (!legacyBody.type || !legacyBody.data) {
       return NextResponse.json(
-        { error: "Missing required fields: type and data" },
+        { error: "Missing required fields: title/body or type/data" },
         { status: 400 }
       );
     }
 
-    switch (body.type) {
+    switch (legacyBody.type) {
       case "trading_signal":
-        await handleTradingSignal(body.data as TradingSignal);
+        await handleTradingSignal(legacyBody.data as TradingSignal);
         break;
 
       case "app_notification":
-        await handleAppNotification(body.data as any);
+        await handleAppNotification(legacyBody.data as any);
         break;
 
       default:

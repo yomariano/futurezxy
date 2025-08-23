@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from 'next/navigation'
 import { LogOut } from "lucide-react"
+import { PushNotificationSetup } from "@/components/PushNotificationSetup"
 
 const alertTypes = [
   {
@@ -342,6 +343,8 @@ const SettingsPage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <PushNotificationSetup />
 
             <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

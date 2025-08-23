@@ -22,13 +22,16 @@ self.addEventListener("fetch", (event) => {
 // Push event - handle incoming push notifications
 self.addEventListener("push", (event) => {
   console.log("Push event received:", event);
+  console.log("Push data:", event.data ? event.data.text() : "No data");
 
   let notificationData = {};
 
   if (event.data) {
     try {
       notificationData = event.data.json();
+      console.log("Parsed notification data:", notificationData);
     } catch (e) {
+      console.warn("Failed to parse push data as JSON, using text:", e);
       notificationData = {
         title: "FutureZXY Alert",
         body: event.data.text() || "New trading signal available",
@@ -36,15 +39,18 @@ self.addEventListener("push", (event) => {
         badge: "/images/logo.png",
       };
     }
+  } else {
+    console.warn("No push data received, using defaults");
   }
 
   const options = {
-    title: notificationData.title || "FutureZXY Alert",
     body: notificationData.body || "New trading signal available",
     icon: notificationData.icon || "/images/logo.png",
     badge: notificationData.badge || "/images/logo.png",
     tag: notificationData.tag || "trading-alert",
-    requireInteraction: true,
+    requireInteraction: false, // Changed to false for better Chrome compatibility
+    silent: false,
+    vibrate: [200, 100, 200], // Add vibration for mobile devices
     data: {
       url: notificationData.url || "/signals",
       timestamp: Date.now(),
@@ -54,7 +60,6 @@ self.addEventListener("push", (event) => {
       {
         action: "view",
         title: "View Signals",
-        icon: "/images/logo.png",
       },
       {
         action: "dismiss",
@@ -63,7 +68,23 @@ self.addEventListener("push", (event) => {
     ],
   };
 
-  event.waitUntil(self.registration.showNotification(options.title, options));
+  console.log("Showing notification with options:", options);
+  const title = notificationData.title || "FutureZXY Alert";
+  
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+      .then(() => {
+        console.log("Notification shown successfully");
+      })
+      .catch((error) => {
+        console.error("Error showing notification:", error);
+        // Fallback: show simple notification
+        return self.registration.showNotification(title, {
+          body: notificationData.body || "New trading signal available",
+          icon: "/images/logo.png",
+        });
+      })
+  );
 });
 
 // Notification click event
