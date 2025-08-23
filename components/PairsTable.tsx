@@ -484,7 +484,7 @@ const subscribeToPushNotifications = async (registration: ServiceWorkerRegistrat
   if (typeof window === 'undefined') return; // SSR guard
   
   try {
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BAXOKzoVmzII8Qr43Zq1ESJE-_fsclD-dNBJqqdPUqTuoATHRnTAabWUS9iT0jAkwqQAn3xClNTcAS7jrwcFdog';
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc';
     
     if (!vapidPublicKey) {
       console.warn("VAPID public key not found");
