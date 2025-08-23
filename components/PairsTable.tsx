@@ -267,6 +267,8 @@ interface NotificationSettings {
 
 // Replace the audio file constant and add this utility function
 const createBellSound = () => {
+  if (typeof window === 'undefined') return null; // SSR guard
+  
   const audioContext = new (window.AudioContext ||
     (window as any).webkitAudioContext)();
 
@@ -319,9 +321,11 @@ let audioContext: AudioContext | null = null;
 
 // Initialize audio context on user interaction
 const initAudioContext = () => {
+  if (typeof window === 'undefined') return; // SSR guard
+  
   if (!audioContext) {
     try {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       console.log("🎵 Audio context initialized");
     } catch (error) {
       console.error("Failed to initialize audio context:", error);
@@ -338,6 +342,8 @@ const initAudioContext = () => {
 
 // Add this near your other utility functions
 const playNotificationSound = async () => {
+  if (typeof window === 'undefined') return; // SSR guard
+  
   try {
     // Ensure audio context is ready
     initAudioContext();
@@ -398,17 +404,18 @@ const playNotificationSound = async () => {
 };
 
 const showNotification = (symbol: string, message: string, signalType: 'buy' | 'sell' | 'info' = 'info') => {
+  if (typeof window === 'undefined') return; // SSR guard
+  
   console.log("Attempting to show notification:", { symbol, message, signalType });
 
   const notificationSettings = JSON.parse(
     localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || "{}"
   );
   
-  // Always create in-app notification if alerts are enabled
+  // Always play sound and log if alerts are enabled
   if (notificationSettings[symbol]) {
-    createInAppNotification(symbol, message, signalType);
     playNotificationSound();
-    debugLog(`🔔 ${symbol} Alert: ${message}`);
+    console.log(`🔔 ${symbol} Alert: ${message}`);
   }
 
   // Try browser notifications as additional layer
@@ -454,28 +461,11 @@ const showNotification = (symbol: string, message: string, signalType: 'buy' | '
   }
 };
 
-// Create in-app notification that always works
-const createInAppNotification = (symbol: string, message: string, type: 'buy' | 'sell' | 'info' = 'info') => {
-  const notification = {
-    id: Date.now().toString() + Math.random().toString(36),
-    symbol,
-    message,
-    timestamp: Date.now(),
-    type
-  };
-  
-  setInAppNotifications(prev => [notification, ...prev.slice(0, 4)]); // Keep only 5 most recent
-  
-  // Auto-remove after 10 seconds
-  setTimeout(() => {
-    setInAppNotifications(prev => prev.filter(n => n.id !== notification.id));
-  }, 10000);
-  
-  console.log("📱 In-app notification created:", notification);
-};
+// Placeholder for createInAppNotification - will be defined inside component
 
 // Get current push subscription
 const getSubscription = async (): Promise<PushSubscription | null> => {
+  if (typeof window === 'undefined') return null; // SSR guard
   if (!('serviceWorker' in navigator)) return null;
   
   try {
@@ -491,8 +481,10 @@ const getSubscription = async (): Promise<PushSubscription | null> => {
 
 // VAPID push notification subscription
 const subscribeToPushNotifications = async (registration: ServiceWorkerRegistration) => {
+  if (typeof window === 'undefined') return; // SSR guard
+  
   try {
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BAXOKzoVmzII8Qr43Zq1ESJE-_fsclD-dNBJqqdPUqTuoATHRnTAabWUS9iT0jAkwqQAn3xClNTcAS7jrwcFdog';
     
     if (!vapidPublicKey) {
       console.warn("VAPID public key not found");
@@ -517,7 +509,7 @@ const subscribeToPushNotifications = async (registration: ServiceWorkerRegistrat
       body: JSON.stringify({
         subscription,
         userId: 'trading-user', // In production, use actual user ID
-        symbols: pairs.map(p => p.symbol), // Subscribe to all current pairs
+        symbols: [], // Subscribe to all pairs - will be updated later
       }),
     });
 
@@ -525,7 +517,7 @@ const subscribeToPushNotifications = async (registration: ServiceWorkerRegistrat
     
     if (result.success) {
       console.log("✅ Push subscription saved successfully");
-      debugLog("🔔 VAPID push notifications enabled");
+      console.log("🔔 VAPID push notifications enabled");
     } else {
       console.error("Failed to save subscription:", result.error);
     }
@@ -777,7 +769,7 @@ const PairsTable = () => {
           `New ${signal.toLowerCase()} signal detected (WT1: ${data.wt1.toFixed(
             2
           )}, WT2: ${data.wt2.toFixed(2)})`,
-          signal === 'BUY' ? 'buy' : 'sell'
+          signal.includes('buy') ? 'buy' : 'sell'
         );
       }
 
@@ -1336,11 +1328,11 @@ const PairsTable = () => {
     
     if (currentPermission === "denied") {
       // Show instructions for resetting permission
-      debugLog(`🔕 Browser notifications are blocked. Sound alerts will still work! To enable notifications:`);
-      debugLog(`🔄 Chrome/Edge: Click the 🔒 lock icon in address bar → Notifications → Allow`);
-      debugLog(`🔄 Firefox: Click the 🛡️ shield icon → Permissions → Notifications → Allow`);
-      debugLog(`🔄 Safari: Safari Menu → Settings → Websites → Notifications → Allow`);
-      debugLog(`🔄 Mobile: Browser Settings → Site Settings → Notifications → Allow`);
+      console.log(`🔕 Browser notifications are blocked. Sound alerts will still work! To enable notifications:`);
+      console.log(`🔄 Chrome/Edge: Click the 🔒 lock icon in address bar → Notifications → Allow`);
+      console.log(`🔄 Firefox: Click the 🛡️ shield icon → Permissions → Notifications → Allow`);
+      console.log(`🔄 Safari: Safari Menu → Settings → Websites → Notifications → Allow`);
+      console.log(`🔄 Mobile: Browser Settings → Site Settings → Notifications → Allow`);
     } else if (currentPermission === "default") {
       // Request permission
       const permission = await Notification.requestPermission();
@@ -1594,9 +1586,8 @@ const PairsTable = () => {
             size="sm"
             onClick={async () => {
               initAudioContext();
-              createInAppNotification("TEST", "🔊 Testing complete notification system - Sound + Visual + Push", "info");
               playNotificationSound();
-              debugLog("🧪 Test notification triggered");
+              console.log("🧪 Test notification triggered - Sound + VAPID Push");
               
               // Test VAPID push notification
               try {
@@ -1613,13 +1604,13 @@ const PairsTable = () => {
                 });
                 
                 if (response.ok) {
-                  debugLog("✅ VAPID push notification sent");
+                  console.log("✅ VAPID push notification sent");
                 } else {
-                  debugLog("⚠️ VAPID push failed - using fallback notifications");
+                  console.log("⚠️ VAPID push failed - using fallback notifications");
                 }
               } catch (error) {
                 console.error("VAPID test failed:", error);
-                debugLog("⚠️ VAPID test failed - fallback notifications active");
+                console.log("⚠️ VAPID test failed - fallback notifications active");
               }
             }}
             className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-800/30"

@@ -9,7 +9,13 @@ webpush.setVapidDetails(
 );
 
 interface PushNotificationRequest {
-  subscription: PushSubscription;
+  subscription: {
+    endpoint: string;
+    keys: {
+      p256dh: string;
+      auth: string;
+    };
+  };
   title: string;
   body: string;
   icon?: string;
@@ -43,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     const options = {
       TTL: 60 * 60 * 24, // 24 hours
-      urgency: 'high',
+      urgency: 'high' as const,
       headers: {
         'Content-Type': 'application/json',
       },
