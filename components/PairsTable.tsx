@@ -400,20 +400,23 @@ const playNotificationSound = async () => {
 const showNotification = (symbol: string, message: string) => {
   console.log("Attempting to show notification:", { symbol, message });
 
+  const notificationSettings = JSON.parse(
+    localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || "{}"
+  );
+  
+  // Always play sound if alerts are enabled for this symbol
+  if (notificationSettings[symbol]) {
+    playNotificationSound();
+  }
+
   if ("Notification" in window) {
     console.log("Notification permission:", Notification.permission);
 
     if (Notification.permission === "granted") {
-      const notificationSettings = JSON.parse(
-        localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || "{}"
-      );
       console.log("Notification settings:", notificationSettings);
 
       if (notificationSettings[symbol]) {
         try {
-          // Play sound first
-          playNotificationSound();
-          
           const notification = new Notification(`${symbol} Trading Alert 📈`, {
             body: message,
             icon: "/favicon.ico",
@@ -433,7 +436,12 @@ const showNotification = (symbol: string, message: string) => {
           console.error("Error sending notification:", error);
         }
       }
-    } else if (Notification.permission !== "denied") {
+    } else if (Notification.permission === "denied") {
+      console.warn("🔕 Notifications denied, but sound will still play");
+      // Show visual alert in the debug console since notifications are blocked
+      debugLog(`🔔 ${symbol} Alert: ${message} (Notifications blocked but sound played)`);
+    } else {
+      console.log("Notification permission not granted yet");
       Notification.requestPermission().then((permission) => {
         console.log("Permission requested:", permission);
         if (permission === "granted") {
@@ -441,6 +449,11 @@ const showNotification = (symbol: string, message: string) => {
         }
       });
     }
+  }
+  
+  // Always show visual feedback in debug console when notifications are enabled
+  if (notificationSettings[symbol]) {
+    console.log(`🔔 ${symbol}: ${message}`);
   }
 };
 
@@ -1217,8 +1230,18 @@ const PairsTable = () => {
     // Initialize audio context on user interaction (important for mobile)
     initAudioContext();
     
-    // Request notification permission if not granted
-    if ("Notification" in window && Notification.permission === "default") {
+    // Check current permission status
+    const currentPermission = "Notification" in window ? Notification.permission : "unsupported";
+    
+    if (currentPermission === "denied") {
+      // Show instructions for resetting permission
+      debugLog(`🔕 Browser notifications are blocked. Sound alerts will still work! To enable notifications:`);
+      debugLog(`🔄 Chrome/Edge: Click the 🔒 lock icon in address bar → Notifications → Allow`);
+      debugLog(`🔄 Firefox: Click the 🛡️ shield icon → Permissions → Notifications → Allow`);
+      debugLog(`🔄 Safari: Safari Menu → Settings → Websites → Notifications → Allow`);
+      debugLog(`🔄 Mobile: Browser Settings → Site Settings → Notifications → Allow`);
+    } else if (currentPermission === "default") {
+      // Request permission
       const permission = await Notification.requestPermission();
       console.log("Notification permission requested:", permission);
     }
@@ -1232,10 +1255,10 @@ const PairsTable = () => {
       )
     );
 
-    // Test notification when enabling alerts
-    if (willBeEnabled && Notification.permission === "granted") {
-      console.log("Testing notification for", symbol);
-      showNotification(symbol, `🔔 Notifications enabled for ${symbol}! You'll hear this sound when signals trigger.`);
+    // Test notification/sound when enabling alerts (works even if notifications are denied)
+    if (willBeEnabled) {
+      console.log("Testing alert system for", symbol);
+      showNotification(symbol, `🔔 Alerts enabled for ${symbol}! You'll hear this sound when signals trigger.`);
     }
 
     // Update notification settings in state and localStorage
@@ -1465,6 +1488,25 @@ const PairsTable = () => {
           >
             {showDebugConsole ? "Hide Debug" : "Show Debug"}
           </Button>
+          
+          {/* Notification Status Indicator */}
+          <div className="flex items-center gap-2 text-xs">
+            {"Notification" in window && (
+              <div className="flex items-center gap-1">
+                {Notification.permission === "granted" && (
+                  <span className="text-green-600 dark:text-green-400">🔔 Notifications ON</span>
+                )}
+                {Notification.permission === "denied" && (
+                  <span className="text-orange-600 dark:text-orange-400" title="Notifications blocked - Sound alerts still work">
+                    🔕 Sound Only
+                  </span>
+                )}
+                {Notification.permission === "default" && (
+                  <span className="text-gray-600 dark:text-gray-400">🔔 Click bell to enable</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
