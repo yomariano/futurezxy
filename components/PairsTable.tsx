@@ -1211,7 +1211,7 @@ const PairsTable = () => {
   };
 
   return (
-    <div className="space-y-4 w-full overflow-x-hidden">
+    <div className="space-y-4 w-full">
       {/* Controls Container - Now with max-width constraint */}
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-4 px-4 sm:px-6 md:px-0 max-w-[1200px] mx-auto">
         <div className="flex items-center space-x-2">
