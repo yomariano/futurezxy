@@ -424,6 +424,8 @@ const PairsTable = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [showDebugConsole, setShowDebugConsole] = useState(true);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Custom logging function that shows on screen
   const debugLog = useCallback((message: string, data?: any) => {
@@ -902,6 +904,29 @@ const PairsTable = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Handle scroll progress tracking
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollContainerRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+        const maxScroll = scrollWidth - clientWidth;
+        const progress = maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
+        setScrollProgress(progress);
+      }
+    };
+
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+      // Initial calculation
+      handleScroll();
+      
+      return () => {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, []);
+
   // Add this helper function
   const getCrossSignal = (symbol: string, timeframe: Timeframe) => {
     return crossSignals.find(
@@ -1248,17 +1273,30 @@ const PairsTable = () => {
         </div>
       )}
 
-      {/* Mobile scroll hint */}
-      <div className="md:hidden text-xs text-gray-500 dark:text-gray-400 mb-2 px-4 flex items-center gap-2">
-        <span>←→ Swipe to view all timeframes</span>
+      {/* Mobile scroll hint with progress */}
+      <div className="md:hidden mb-2 px-4">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+          <span>←→ Swipe to view all timeframes</span>
+          <span>{Math.round(scrollProgress)}%</span>
+        </div>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+          <div 
+            className="bg-blue-500 h-1 rounded-full transition-all duration-150 ease-out"
+            style={{ width: `${scrollProgress}%` }}
+          />
+        </div>
       </div>
 
       {/* Table Container - Mobile-optimized horizontal scroll */}
-      <div className="overflow-x-auto overflow-y-visible touch-pan-x" style={{ 
-        WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'thin',
-        scrollbarColor: 'rgba(156, 163, 175, 0.5) transparent'
-      }}>
+      <div 
+        ref={scrollContainerRef}
+        className="overflow-x-auto overflow-y-visible touch-pan-x mobile-scroll-container" 
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'auto',
+          scrollbarColor: 'rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3)'
+        }}
+      >
         <div className="min-w-full bg-background dark:bg-gray-900 rounded-lg" style={{ 
           minWidth: 'max-content',
           width: 'fit-content'
