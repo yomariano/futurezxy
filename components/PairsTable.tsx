@@ -789,14 +789,45 @@ const PairsTable = () => {
             ? "WT1" 
             : "WT2";
         const signalToReport = isNewGreenSignal ? signal : wt2Signal;
+        const notificationMessage = `🎯 ${triggerType} ${signalToReport.toUpperCase()} signal on ${data.timeframe} (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`;
         
-        debugLog(`🔔 Triggering sound notification for ${data.symbol} on ${data.timeframe} - ${triggerType} turned green`);
+        debugLog(`🔔 Triggering notifications for ${data.symbol} on ${data.timeframe} - ${triggerType} turned green`);
+        
+        // Play sound notification
         playBell?.();
+        
+        // Show local notification
         showNotification(
           data.symbol,
-          `🎯 ${triggerType} ${signalToReport.toUpperCase()} signal on ${data.timeframe} (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`,
+          notificationMessage,
           'buy'
         );
+
+        // Send push notification
+        fetch('/api/notifications/trigger', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: `${data.symbol} - ${triggerType} Signal`,
+            body: notificationMessage,
+            tag: `wt-signal-${data.symbol}-${data.timeframe}`,
+            url: '/signals',
+            data: {
+              symbol: data.symbol,
+              timeframe: data.timeframe,
+              triggerType,
+              signal: signalToReport,
+              wt1: data.wt1,
+              wt2: data.wt2,
+              price: data.price,
+              timestamp: Date.now(),
+            },
+          }),
+        }).catch(error => {
+          console.error('Failed to send push notification:', error);
+        });
       }
 
       // Update pair data
