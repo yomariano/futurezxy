@@ -598,7 +598,7 @@ const PairsTable = () => {
   const [playBell, setPlayBell] = useState<(() => void) | null>(null);
   const [settings, setSettings] = useState<WaveTrendSettings>(DEFAULT_SETTINGS);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [notificationLogs, setNotificationLogs] = useState<string[]>([]);
   const [showDebugConsole, setShowDebugConsole] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -611,18 +611,32 @@ const PairsTable = () => {
     type: 'buy' | 'sell' | 'info';
   }>>([]);
 
-  // Custom logging function that shows on screen
-  const debugLog = useCallback((message: string, data?: any) => {
+  // Custom notification logging function that shows push notifications on screen
+  const notificationLog = useCallback((message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = data 
       ? `[${timestamp}] ${message} ${JSON.stringify(data, null, 2)}`
       : `[${timestamp}] ${message}`;
     
-    // Removed console log for WebSocket messages to reduce noise
-    setDebugLogs(prev => [...prev.slice(-19), logEntry]); // Keep last 20 logs
+    console.log('🔔 ' + message, data); // Log to console for debugging
+    setNotificationLogs(prev => [...prev.slice(-19), logEntry]); // Keep last 20 logs
   }, []);
 
-  // Debug console initialized
+  // Listen for global push notification events
+  useEffect(() => {
+    const handlePushNotificationEvent = (event: CustomEvent) => {
+      notificationLog(event.detail.message, event.detail.data);
+    };
+
+    window.addEventListener('pushNotificationSent', handlePushNotificationEvent as EventListener);
+    
+    // Add initial log
+    notificationLog('🔔 Push notification console initialized');
+
+    return () => {
+      window.removeEventListener('pushNotificationSent', handlePushNotificationEvent as EventListener);
+    };
+  }, [notificationLog]);
 
   // Load saved order on mount
   useEffect(() => {
@@ -794,6 +808,14 @@ const PairsTable = () => {
           'buy'
         );
 
+        // Log push notification being sent
+        notificationLog(`📤 Sending ${triggerType} push notification for ${data.symbol} (${data.timeframe})`, {
+          signal: signalToReport,
+          wt1: data.wt1.toFixed(2),
+          wt2: data.wt2.toFixed(2),
+          price: data.price
+        });
+
         // Send push notification
         fetch('/api/notifications/trigger', {
           method: 'POST',
@@ -816,8 +838,15 @@ const PairsTable = () => {
               timestamp: Date.now(),
             },
           }),
+        }).then(response => {
+          if (response.ok) {
+            notificationLog(`✅ Push notification sent successfully for ${data.symbol}`);
+          } else {
+            notificationLog(`❌ Push notification failed for ${data.symbol} (HTTP ${response.status})`);
+          }
         }).catch(error => {
           console.error('Failed to send push notification:', error);
+          notificationLog(`❌ Push notification error for ${data.symbol}: ${error.message}`);
         });
       }
 
@@ -1750,34 +1779,34 @@ const PairsTable = () => {
         </div>
       )}
 
-      {/* Debug Console */}
+      {/* Push Notification Console */}
       {showDebugConsole && (
-        <div className="mb-4 p-4 bg-gray-900 text-green-400 rounded-lg font-mono text-xs max-h-80 overflow-y-auto">
+        <div className="mb-4 p-4 bg-blue-950 text-blue-200 rounded-lg font-mono text-xs max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-green-300 font-bold">WebSocket Debug Console</h3>
+            <h3 className="text-blue-300 font-bold flex items-center gap-2">
+              <span>🔔</span> Push Notifications Log
+            </h3>
             <div className="flex items-center gap-2">
               <div className={cn(
                 "w-2 h-2 rounded-full",
-                isConnected ? "bg-green-500" : "bg-red-500"
+                "bg-blue-500"
               )}></div>
-              <span className="text-xs">
-                {isConnected ? "Connected" : isLoading ? "Connecting..." : "Disconnected"}
-              </span>
+              <span className="text-xs">Live</span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setDebugLogs([])}
-                className="text-xs h-6 px-2 text-gray-400 hover:text-white"
+                onClick={() => setNotificationLogs([])}
+                className="text-xs h-6 px-2 text-blue-400 hover:text-white"
               >
                 Clear
               </Button>
             </div>
           </div>
           <div className="space-y-1">
-            {debugLogs.length === 0 ? (
-              <div className="text-gray-500">No debug logs yet...</div>
+            {notificationLogs.length === 0 ? (
+              <div className="text-blue-400">No push notifications sent yet...</div>
             ) : (
-              debugLogs.map((log, index) => (
+              notificationLogs.map((log, index) => (
                 <div key={index} className="break-words">
                   {log}
                 </div>

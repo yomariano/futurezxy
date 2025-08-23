@@ -71,6 +71,14 @@ export function PushNotificationSetup() {
           setIsSubscribed(true);
           setPermission('granted');
           
+          // Log subscription success
+          window.dispatchEvent(new CustomEvent('pushNotificationSent', {
+            detail: {
+              message: '✅ Push notification subscription enabled successfully',
+              data: { action: 'subscribe', endpoint: result.subscription.endpoint.substring(0, 50) + '...' }
+            }
+          }));
+          
           // Test notification
           await testNotification();
         } else {
@@ -89,6 +97,14 @@ export function PushNotificationSetup() {
 
   const testNotification = async () => {
     try {
+      // Dispatch event to log in notification console
+      window.dispatchEvent(new CustomEvent('pushNotificationSent', {
+        detail: {
+          message: '🧪 Test push notification triggered from settings',
+          data: { source: 'test-button', timestamp: new Date().toISOString() }
+        }
+      }));
+
       const response = await fetch('/api/notifications/test', {
         method: 'GET',
       });
@@ -97,13 +113,31 @@ export function PushNotificationSetup() {
       
       if (response.ok) {
         console.log('Test notification sent successfully:', result);
+        window.dispatchEvent(new CustomEvent('pushNotificationSent', {
+          detail: {
+            message: '✅ Test push notification sent successfully',
+            data: { result: result.message }
+          }
+        }));
       } else {
         console.error('Failed to send test notification:', result.error);
         setError(result.error || 'Failed to send test notification');
+        window.dispatchEvent(new CustomEvent('pushNotificationSent', {
+          detail: {
+            message: '❌ Test push notification failed',
+            data: { error: result.error }
+          }
+        }));
       }
     } catch (error) {
       console.error('Error sending test notification:', error);
       setError('Error sending test notification');
+      window.dispatchEvent(new CustomEvent('pushNotificationSent', {
+        detail: {
+          message: '❌ Test push notification error',
+          data: { error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      }));
     }
   };
 
