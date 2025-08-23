@@ -45,7 +45,7 @@ export default function RootLayout({
             children
           ) : (
             <DashboardLayout>
-              <main className="md:pl-64 pb-16 md:pb-0">{children}</main>
+              <main className="md:pl-64 pb-16 md:pb-0 overflow-x-visible min-w-0">{children}</main>
               <MobileNav />
             </DashboardLayout>
           )}
