@@ -58,9 +58,11 @@ export default function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
         onPairAdded?.(data.pair)
         
         // Dispatch custom event for other components to listen
-        window.dispatchEvent(new CustomEvent('pairAdded', { 
-          detail: data.pair 
-        }));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('pairAdded', { 
+            detail: data.pair 
+          }));
+        }
         
         // Close dialog after a short delay to show success message
         setTimeout(() => {
