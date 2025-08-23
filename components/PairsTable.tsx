@@ -397,64 +397,81 @@ const playNotificationSound = async () => {
   }
 };
 
-const showNotification = (symbol: string, message: string) => {
-  console.log("Attempting to show notification:", { symbol, message });
+const showNotification = (symbol: string, message: string, signalType: 'buy' | 'sell' | 'info' = 'info') => {
+  console.log("Attempting to show notification:", { symbol, message, signalType });
 
   const notificationSettings = JSON.parse(
     localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || "{}"
   );
   
-  // Always play sound if alerts are enabled for this symbol
+  // Always create in-app notification if alerts are enabled
   if (notificationSettings[symbol]) {
+    createInAppNotification(symbol, message, signalType);
     playNotificationSound();
+    debugLog(`🔔 ${symbol} Alert: ${message}`);
   }
 
+  // Try browser notifications as additional layer
   if ("Notification" in window) {
     console.log("Notification permission:", Notification.permission);
 
-    if (Notification.permission === "granted") {
-      console.log("Notification settings:", notificationSettings);
+    if (Notification.permission === "granted" && notificationSettings[symbol]) {
+      try {
+        const notification = new Notification(`${symbol} Trading Alert 📈`, {
+          body: message,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: `trading-${symbol}`,
+          requireInteraction: true,
+          silent: false,
+        });
 
-      if (notificationSettings[symbol]) {
-        try {
-          const notification = new Notification(`${symbol} Trading Alert 📈`, {
-            body: message,
-            icon: "/favicon.ico",
-            badge: "/favicon.ico",
-            tag: `trading-${symbol}`,
-            requireInteraction: true,
-            silent: false,
-          });
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
 
-          notification.onclick = () => {
-            window.focus();
-            notification.close();
-          };
+        // Force show notification even if it might fail
+        setTimeout(() => {
+          if (notification) {
+            console.log("✅ Browser notification attempted");
+          }
+        }, 100);
 
-          console.log("✅ Notification sent successfully with sound");
-        } catch (error) {
-          console.error("Error sending notification:", error);
-        }
+        console.log("✅ Browser notification created");
+      } catch (error) {
+        console.warn("Browser notification failed, in-app notification shown instead:", error);
       }
-    } else if (Notification.permission === "denied") {
-      console.warn("🔕 Notifications denied, but sound will still play");
-      // Show visual alert in the debug console since notifications are blocked
-      debugLog(`🔔 ${symbol} Alert: ${message} (Notifications blocked but sound played)`);
-    } else {
-      console.log("Notification permission not granted yet");
+    } else if (Notification.permission === "default") {
+      console.log("Requesting notification permission...");
       Notification.requestPermission().then((permission) => {
-        console.log("Permission requested:", permission);
+        console.log("Permission result:", permission);
         if (permission === "granted") {
-          showNotification(symbol, message);
+          showNotification(symbol, message, signalType);
         }
       });
     }
   }
+};
+
+// Create in-app notification that always works
+const createInAppNotification = (symbol: string, message: string, type: 'buy' | 'sell' | 'info' = 'info') => {
+  const notification = {
+    id: Date.now().toString() + Math.random().toString(36),
+    symbol,
+    message,
+    timestamp: Date.now(),
+    type
+  };
   
-  // Always show visual feedback in debug console when notifications are enabled
-  if (notificationSettings[symbol]) {
-    console.log(`🔔 ${symbol}: ${message}`);
-  }
+  setInAppNotifications(prev => [notification, ...prev.slice(0, 4)]); // Keep only 5 most recent
+  
+  // Auto-remove after 10 seconds
+  setTimeout(() => {
+    setInAppNotifications(prev => prev.filter(n => n.id !== notification.id));
+  }, 10000);
+  
+  console.log("📱 In-app notification created:", notification);
 };
 
 // Update the testNotification function
@@ -526,6 +543,13 @@ const PairsTable = () => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [inAppNotifications, setInAppNotifications] = useState<Array<{
+    id: string;
+    symbol: string;
+    message: string;
+    timestamp: number;
+    type: 'buy' | 'sell' | 'info';
+  }>>([]);
 
   // Custom logging function that shows on screen
   const debugLog = useCallback((message: string, data?: any) => {
@@ -674,9 +698,10 @@ const PairsTable = () => {
         playBell?.();
         showNotification(
           data.symbol,
-          `New buy signal detected (WT1: ${data.wt1.toFixed(
+          `New ${signal.toLowerCase()} signal detected (WT1: ${data.wt1.toFixed(
             2
-          )}, WT2: ${data.wt2.toFixed(2)})`
+          )}, WT2: ${data.wt2.toFixed(2)})`,
+          signal === 'BUY' ? 'buy' : 'sell'
         );
       }
 
@@ -1488,6 +1513,19 @@ const PairsTable = () => {
           >
             {showDebugConsole ? "Hide Debug" : "Show Debug"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              initAudioContext();
+              createInAppNotification("TEST", "🔊 Testing notification system - Sound + Visual", "info");
+              playNotificationSound();
+              debugLog("🧪 Test notification triggered");
+            }}
+            className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-800/30"
+          >
+            🧪 Test Alert
+          </Button>
           
           {/* Notification Status Indicator */}
           <div className="flex items-center gap-2 text-xs">
@@ -1509,6 +1547,61 @@ const PairsTable = () => {
           </div>
         </div>
       </div>
+
+      {/* In-App Notifications */}
+      {inAppNotifications.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+          {inAppNotifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={cn(
+                "p-4 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300",
+                notification.type === 'buy' 
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
+                  : notification.type === 'sell'
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                  : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+              )}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn(
+                      "text-sm font-semibold",
+                      notification.type === 'buy' 
+                        ? "text-green-800 dark:text-green-200" 
+                        : notification.type === 'sell'
+                        ? "text-red-800 dark:text-red-200"
+                        : "text-blue-800 dark:text-blue-200"
+                    )}>
+                      {notification.type === 'buy' ? '📈' : notification.type === 'sell' ? '📉' : '🔔'} {notification.symbol}
+                    </span>
+                  </div>
+                  <p className={cn(
+                    "text-xs",
+                    notification.type === 'buy' 
+                      ? "text-green-700 dark:text-green-300" 
+                      : notification.type === 'sell'
+                      ? "text-red-700 dark:text-red-300"
+                      : "text-blue-700 dark:text-blue-300"
+                  )}>
+                    {notification.message}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {new Date(notification.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setInAppNotifications(prev => prev.filter(n => n.id !== notification.id))}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Debug Console */}
       {showDebugConsole && (
