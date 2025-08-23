@@ -1211,7 +1211,7 @@ const PairsTable = () => {
   };
 
   return (
-    <div className="space-y-4 w-full overflow-x-visible">
+    <div className="space-y-4 w-full overflow-x-hidden">
       {/* Controls Container - Now with max-width constraint */}
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-4 px-4 sm:px-6 md:px-0 max-w-[1200px] mx-auto">
         <div className="flex items-center space-x-2">
@@ -1313,9 +1313,9 @@ const PairsTable = () => {
           scrollbarColor: 'rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3)'
         }}
       >
-        <div className="min-w-full bg-background dark:bg-gray-900 rounded-lg" style={{ 
-          minWidth: '1200px', // Ensure table is wide enough to scroll on mobile
-          width: 'max-content'
+        <div className="bg-background dark:bg-gray-900 rounded-lg" style={{ 
+          width: 'max-content',
+          minWidth: 'max-content'
         }}>
           <DragDropContext onDragEnd={onDragEnd}>
             <Table>

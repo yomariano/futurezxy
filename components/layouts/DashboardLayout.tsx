@@ -14,7 +14,7 @@ export default function DashboardLayout({
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="flex h-screen w-full overflow-x-visible overflow-y-hidden">
+    <div className="flex h-screen w-full overflow-hidden">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex h-full">
         <Sidebar isMobile={false} />
@@ -37,7 +37,7 @@ export default function DashboardLayout({
         </div> */}
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-visible min-w-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
           {children}
         </div>
       </div>
