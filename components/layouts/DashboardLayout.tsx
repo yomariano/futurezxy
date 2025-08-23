@@ -14,7 +14,7 @@ export default function DashboardLayout({
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-screen w-full overflow-y-hidden">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex h-full">
         <Sidebar isMobile={false} />
