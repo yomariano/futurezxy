@@ -49,8 +49,10 @@ interface SendBulkNotificationRequest {
 }
 
 // POST /api/notifications - Send push notification
+// 🚫🔐 NO AUTHENTICATION REQUIRED - Bypassed for testing
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔓 Push notification API called - AUTH BYPASSED');
     initializeWebPush();
     const body = await request.json();
 

@@ -34,9 +34,11 @@ interface LegacyTriggerNotificationRequest {
       };
 }
 
-// POST /api/notifications/trigger - Trigger specific types of notifications
+// POST /api/notifications/trigger - Trigger specific types of notifications  
+// 🚫🔐 NO AUTHENTICATION REQUIRED - Bypassed for testing
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔓 Notification trigger API called - AUTH BYPASSED');
     const body = await request.json();
     console.log('🚀 Notification trigger called with:', body);
 

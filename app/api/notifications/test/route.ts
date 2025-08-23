@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // GET /api/notifications/test - Send a test push notification
+// 🚫🔐 NO AUTHENTICATION REQUIRED - Bypassed for testing
 export async function GET() {
   try {
+    console.log('🔓 Test notification API called - AUTH BYPASSED');
     console.log('Test notification endpoint called');
     
     // Send a test notification

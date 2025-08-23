@@ -6,8 +6,10 @@ const subscriptions = new Map<string, any>();
 
 
 // POST /api/notifications/subscribe - Subscribe to push notifications
+// 🚫🔐 NO AUTHENTICATION REQUIRED - Bypassed for testing
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔓 Subscription API called - AUTH BYPASSED');
     const body = await request.json();
     const { subscription, userId } = body;
 
