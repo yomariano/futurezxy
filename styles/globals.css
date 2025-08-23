@@ -156,6 +156,9 @@ body {
   /* Force scrollbar to always show on mobile */
   scrollbar-width: auto;
   scrollbar-color: rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3);
+  /* Force scroll behavior */
+  overflow-x: scroll !important;
+  overflow-y: visible !important;
 }
 
 /* Webkit browsers (iOS Safari, Chrome) */
@@ -194,12 +197,26 @@ body {
 
 /* Mobile-specific enhancements */
 @media (max-width: 768px) {
+  .mobile-scroll-container {
+    /* Force scrollbar to always show on mobile */
+    overflow-x: scroll !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
   .mobile-scroll-container::-webkit-scrollbar {
-    height: 14px; /* Larger on mobile for better touch */
+    height: 14px !important; /* Larger on mobile for better touch */
+    display: block !important;
+    -webkit-appearance: none !important;
   }
   
   .mobile-scroll-container::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.9);
-    min-width: 40px; /* Minimum thumb size for touch */
+    background: rgba(59, 130, 246, 0.9) !important;
+    min-width: 40px !important; /* Minimum thumb size for touch */
+    -webkit-appearance: none !important;
+  }
+  
+  .mobile-scroll-container::-webkit-scrollbar-track {
+    background: rgba(229, 231, 235, 0.5) !important;
+    -webkit-appearance: none !important;
   }
 }

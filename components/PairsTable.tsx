@@ -26,6 +26,8 @@ import {
   Bell,
   Pin,
   Settings,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Tooltip,
@@ -426,6 +428,8 @@ const PairsTable = () => {
   const [showDebugConsole, setShowDebugConsole] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   // Custom logging function that shows on screen
   const debugLog = useCallback((message: string, data?: any) => {
@@ -912,6 +916,10 @@ const PairsTable = () => {
         const maxScroll = scrollWidth - clientWidth;
         const progress = maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
         setScrollProgress(progress);
+        
+        // Update scroll button states
+        setCanScrollLeft(scrollLeft > 0);
+        setCanScrollRight(scrollLeft < maxScroll - 1);
       }
     };
 
@@ -926,6 +934,19 @@ const PairsTable = () => {
       };
     }
   }, []);
+
+  // Scroll functions for mobile buttons
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+    }
+  };
 
   // Add this helper function
   const getCrossSignal = (symbol: string, timeframe: Timeframe) => {
@@ -1273,28 +1294,51 @@ const PairsTable = () => {
         </div>
       )}
 
-      {/* Mobile scroll hint with progress */}
+      {/* Mobile scroll hint with progress and buttons */}
       <div className="md:hidden mb-2 px-4">
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
           <span>←→ Swipe to view all timeframes</span>
           <span>{Math.round(scrollProgress)}%</span>
         </div>
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-          <div 
-            className="bg-blue-500 h-1 rounded-full transition-all duration-150 ease-out"
-            style={{ width: `${scrollProgress}%` }}
-          />
+        
+        {/* Progress bar with scroll buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={scrollLeft}
+            disabled={!canScrollLeft}
+            className="p-1 rounded bg-blue-500 text-white disabled:bg-gray-300 disabled:text-gray-500 disabled:opacity-50 flex-shrink-0"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          
+          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-blue-500 h-2 rounded-full transition-all duration-150 ease-out"
+              style={{ width: `${scrollProgress}%` }}
+            />
+          </div>
+          
+          <button
+            onClick={scrollRight}
+            disabled={!canScrollRight}
+            className="p-1 rounded bg-blue-500 text-white disabled:bg-gray-300 disabled:text-gray-500 disabled:opacity-50 flex-shrink-0"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
       </div>
 
       {/* Table Container - Mobile-optimized horizontal scroll */}
       <div 
         ref={scrollContainerRef}
-        className="overflow-x-auto overflow-y-visible touch-pan-x mobile-scroll-container" 
+        className="overflow-x-scroll overflow-y-visible touch-pan-x mobile-scroll-container" 
         style={{ 
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'auto',
-          scrollbarColor: 'rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3)'
+          scrollbarColor: 'rgba(59, 130, 246, 0.8) rgba(229, 231, 235, 0.3)',
+          overflowX: 'scroll'
         }}
       >
         <div className="min-w-full bg-background dark:bg-gray-900 rounded-lg" style={{ 
