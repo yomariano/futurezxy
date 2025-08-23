@@ -1159,13 +1159,12 @@ const PairsTable = () => {
         });
       }
     } catch (error) {
-
+      // Error loading pairs
     }
-
+  }, []);
 
   // Handle new pair added
   const handlePairAdded = useCallback((newPair: any) => {
-
     setPairs(currentPairs => {
       const exists = currentPairs.find(p => p.symbol === newPair.symbol);
       if (!exists) {
@@ -1177,12 +1176,11 @@ const PairsTable = () => {
       }
       return currentPairs;
     });
-
+  }, []);
 
   useEffect(() => {
     if (connectionAttempted.current) return;
     connectionAttempted.current = true;
-
 
     loadPairs();
     connectWebSocket();
