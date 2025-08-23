@@ -18,8 +18,14 @@ export default function AuthButton() {
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.refresh()
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+      router.refresh()
+    } catch (error) {
+      console.warn('Sign out error:', error)
+      // Clear local session even if server logout fails
+      router.refresh()
+    }
   }
 
   return (

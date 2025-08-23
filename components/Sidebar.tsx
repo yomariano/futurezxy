@@ -37,9 +37,16 @@ export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+      router.push('/')
+      router.refresh()
+    } catch (error) {
+      console.warn('Sign out error:', error)
+      // Clear local session even if server logout fails
+      router.push('/')
+      router.refresh()
+    }
   }
 
   return (
