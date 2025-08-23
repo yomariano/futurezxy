@@ -135,8 +135,6 @@ const calculateSignal = (
   wt: number,
   settings: WaveTrendSettings
 ): SignalType => {
-  console.log("Calculating signal:", { wt, settings });
-
   const TRANSITION_PERCENTAGE = 0.05;
 
   const buyTransitionZone =
@@ -620,14 +618,11 @@ const PairsTable = () => {
       ? `[${timestamp}] ${message} ${JSON.stringify(data, null, 2)}`
       : `[${timestamp}] ${message}`;
     
-    console.log(message, data); // Still log to browser console
+    // Removed console log for WebSocket messages to reduce noise
     setDebugLogs(prev => [...prev.slice(-19), logEntry]); // Keep last 20 logs
   }, []);
 
-  // Initialize with a welcome message
-  useEffect(() => {
-    debugLog("🔧 Debug console initialized - ready for WebSocket debugging!");
-  }, [debugLog]);
+  // Debug console initialized
 
   // Load saved order on mount
   useEffect(() => {
@@ -739,11 +734,7 @@ const PairsTable = () => {
   }, []);
 
   const handleIndicatorMessage = (data: IndicatorMessage) => {
-    console.log("Received indicator message:", data);
-    console.log("Current settings:", settings);
-
     const signal = calculateSignal(data.wt1, settings);
-    console.log("Calculated signal:", signal);
 
     // Update timeframes if we receive a new one (fallback for new timeframes)
     setTimeframes((current) => {
@@ -1199,7 +1190,7 @@ const PairsTable = () => {
     // Cleanup function
     return () => {
       if (ws) {
-        console.log("🧹 Cleaning up WebSocket connection");
+        // Cleaning up WebSocket connection
         ws.close(1000, "Component unmounting"); // 1000 is normal closure
         setWs(null);
         setIsConnected(false);
@@ -1307,12 +1298,12 @@ const PairsTable = () => {
   // Modify the connect button handler
   const handleConnectionToggle = () => {
     if (isConnected && ws) {
-      console.log("👋 User initiated disconnect");
+      // User initiated disconnect
       ws.close(1000, "User initiated disconnect");
       setWs(null);
       setIsConnected(false);
     } else {
-      console.log("🤝 User initiated connect");
+      // User initiated connect
       connectWebSocket();
     }
   };
