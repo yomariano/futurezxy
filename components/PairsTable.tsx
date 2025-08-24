@@ -799,12 +799,14 @@ const PairsTable = () => {
       const wasWt2GreenSignal = previousWt2Signal === "buy" || previousWt2Signal === "extreme-buy" || previousWt2Signal === "near-buy";
       const isNewWt2GreenSignal = isWt2GreenSignal && !wasWt2GreenSignal;
 
-      // Trigger notification if on 1m or 5m timeframe and either WT1 or WT2 turns green
-      if (
+      // Store notification data for processing outside setPairs callback
+      const shouldNotify = (
         (data.timeframe === "1m" || data.timeframe === "5m") &&
         (isNewGreenSignal || isNewWt2GreenSignal) &&
         notificationSettings[data.symbol]
-      ) {
+      );
+
+      if (shouldNotify) {
         const triggerType = isNewGreenSignal && isNewWt2GreenSignal 
           ? "Both WT1 & WT2" 
           : isNewGreenSignal 
@@ -813,8 +815,7 @@ const PairsTable = () => {
         const signalToReport = isNewGreenSignal ? signal : wt2Signal;
         const notificationMessage = `🎯 ${triggerType} ${signalToReport.toUpperCase()} signal on ${data.timeframe} (WT1: ${data.wt1.toFixed(2)}, WT2: ${data.wt2.toFixed(2)})`;
         
-        // Triggering notifications
-        
+        // Triggering notifications synchronously
         // Play sound notification
         playBell?.();
         
@@ -833,39 +834,13 @@ const PairsTable = () => {
           price: data.price
         });
 
-        // Send OneSignal notification first
-        const oneSignalSuccess = await sendNotification(
-          `${data.symbol} - ${triggerType} Signal`,
-          notificationMessage,
-          {
-            symbol: data.symbol,
-            timeframe: data.timeframe,
-            triggerType,
-            signal: signalToReport,
-            wt1: data.wt1,
-            wt2: data.wt2,
-            price: data.price,
-            timestamp: Date.now()
-          }
-        );
-
-        if (oneSignalSuccess) {
-          notificationLog(`✅ OneSignal notification sent for ${data.symbol}`);
-        } else {
-          notificationLog(`⚠️ OneSignal failed, trying VAPID fallback for ${data.symbol}`);
-          
-          // Fallback to VAPID push notification
-          fetch('/api/notifications/trigger', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              title: `${data.symbol} - ${triggerType} Signal`,
-              body: notificationMessage,
-              tag: `wt-signal-${data.symbol}-${data.timeframe}`,
-              url: '/signals',
-              data: {
+        // Send notifications asynchronously without await in callback
+        (async () => {
+          try {
+            const oneSignalSuccess = await sendNotification(
+              `${data.symbol} - ${triggerType} Signal`,
+              notificationMessage,
+              {
                 symbol: data.symbol,
                 timeframe: data.timeframe,
                 triggerType,
@@ -873,20 +848,50 @@ const PairsTable = () => {
                 wt1: data.wt1,
                 wt2: data.wt2,
                 price: data.price,
-                timestamp: Date.now(),
-              },
-            }),
-          }).then(response => {
-            if (response.ok) {
-              notificationLog(`✅ VAPID fallback sent for ${data.symbol}`);
+                timestamp: Date.now()
+              }
+            );
+
+            if (oneSignalSuccess) {
+              notificationLog(`✅ OneSignal notification sent for ${data.symbol}`);
             } else {
-              notificationLog(`❌ All notifications failed for ${data.symbol}`);
+              notificationLog(`⚠️ OneSignal failed, trying VAPID fallback for ${data.symbol}`);
+              
+              // Fallback to VAPID push notification
+              const response = await fetch('/api/notifications/trigger', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  title: `${data.symbol} - ${triggerType} Signal`,
+                  body: notificationMessage,
+                  tag: `wt-signal-${data.symbol}-${data.timeframe}`,
+                  url: '/signals',
+                  data: {
+                    symbol: data.symbol,
+                    timeframe: data.timeframe,
+                    triggerType,
+                    signal: signalToReport,
+                    wt1: data.wt1,
+                    wt2: data.wt2,
+                    price: data.price,
+                    timestamp: Date.now(),
+                  },
+                }),
+              });
+
+              if (response.ok) {
+                notificationLog(`✅ VAPID fallback sent for ${data.symbol}`);
+              } else {
+                notificationLog(`❌ All notifications failed for ${data.symbol}`);
+              }
             }
-          }).catch(error => {
+          } catch (error: any) {
             console.error('Failed to send push notification:', error);
             notificationLog(`❌ All notifications failed for ${data.symbol}: ${error.message}`);
-          });
-        }
+          }
+        })();
       }
 
       // Update pair data
@@ -1718,9 +1723,9 @@ const PairsTable = () => {
                     notificationLog("❌ All notification tests failed");
                   }
                 }
-              } catch (error) {
+              } catch (error: any) {
                 console.error("Notification test failed:", error);
-                notificationLog(`❌ Test failed: ${error.message}`);
+                notificationLog(`❌ Test failed: ${error?.message || 'Unknown error'}`);
               }
             }}
             className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-800/30"
