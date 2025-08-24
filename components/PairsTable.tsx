@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { initOneSignal, subscribeToNotifications, sendNotification } from "@/utils/onesignal";
 import {
   Activity,
   Waves,
@@ -699,6 +700,22 @@ const PairsTable = () => {
   // Add this useEffect to request notification permission and initialize audio on component mount
   useEffect(() => {
     const initNotifications = async () => {
+      // Initialize OneSignal first
+      initOneSignal();
+      
+      // Try to subscribe to OneSignal notifications
+      try {
+        const subscribed = await subscribeToNotifications();
+        if (subscribed) {
+          notificationLog("✅ OneSignal notifications enabled");
+        } else {
+          notificationLog("⚠️ OneSignal subscription pending user permission");
+        }
+      } catch (error) {
+        console.error("OneSignal initialization error:", error);
+        notificationLog("❌ OneSignal failed, using fallback notifications");
+      }
+
       if ("Notification" in window && "serviceWorker" in navigator) {
         try {
           // Register service worker
@@ -816,38 +833,60 @@ const PairsTable = () => {
           price: data.price
         });
 
-        // Send push notification
-        fetch('/api/notifications/trigger', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title: `${data.symbol} - ${triggerType} Signal`,
-            body: notificationMessage,
-            tag: `wt-signal-${data.symbol}-${data.timeframe}`,
-            url: '/signals',
-            data: {
-              symbol: data.symbol,
-              timeframe: data.timeframe,
-              triggerType,
-              signal: signalToReport,
-              wt1: data.wt1,
-              wt2: data.wt2,
-              price: data.price,
-              timestamp: Date.now(),
-            },
-          }),
-        }).then(response => {
-          if (response.ok) {
-            notificationLog(`✅ Push notification sent successfully for ${data.symbol}`);
-          } else {
-            notificationLog(`❌ Push notification failed for ${data.symbol} (HTTP ${response.status})`);
+        // Send OneSignal notification first
+        const oneSignalSuccess = await sendNotification(
+          `${data.symbol} - ${triggerType} Signal`,
+          notificationMessage,
+          {
+            symbol: data.symbol,
+            timeframe: data.timeframe,
+            triggerType,
+            signal: signalToReport,
+            wt1: data.wt1,
+            wt2: data.wt2,
+            price: data.price,
+            timestamp: Date.now()
           }
-        }).catch(error => {
-          console.error('Failed to send push notification:', error);
-          notificationLog(`❌ Push notification error for ${data.symbol}: ${error.message}`);
-        });
+        );
+
+        if (oneSignalSuccess) {
+          notificationLog(`✅ OneSignal notification sent for ${data.symbol}`);
+        } else {
+          notificationLog(`⚠️ OneSignal failed, trying VAPID fallback for ${data.symbol}`);
+          
+          // Fallback to VAPID push notification
+          fetch('/api/notifications/trigger', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              title: `${data.symbol} - ${triggerType} Signal`,
+              body: notificationMessage,
+              tag: `wt-signal-${data.symbol}-${data.timeframe}`,
+              url: '/signals',
+              data: {
+                symbol: data.symbol,
+                timeframe: data.timeframe,
+                triggerType,
+                signal: signalToReport,
+                wt1: data.wt1,
+                wt2: data.wt2,
+                price: data.price,
+                timestamp: Date.now(),
+              },
+            }),
+          }).then(response => {
+            if (response.ok) {
+              notificationLog(`✅ VAPID fallback sent for ${data.symbol}`);
+            } else {
+              notificationLog(`❌ All notifications failed for ${data.symbol}`);
+            }
+          }).catch(error => {
+            console.error('Failed to send push notification:', error);
+            notificationLog(`❌ All notifications failed for ${data.symbol}: ${error.message}`);
+          });
+        }
       }
 
       // Update pair data
@@ -1641,30 +1680,47 @@ const PairsTable = () => {
             onClick={async () => {
               initAudioContext();
               playNotificationSound();
-              console.log("🧪 Test notification triggered - Sound + VAPID Push");
+              console.log("🧪 Test notification triggered - Sound + OneSignal + VAPID");
               
-              // Test VAPID push notification
+              // Test OneSignal notification first
               try {
-                const response = await fetch('/api/notifications/push', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    subscription: await getSubscription(),
-                    title: "🧪 Test Alert - VAPID Push",
-                    body: "This is a test of the VAPID push notification system",
-                    tag: "test-notification",
-                    url: "/signals"
-                  }),
-                });
+                const oneSignalSuccess = await sendNotification(
+                  "🧪 Test Alert - OneSignal",
+                  "This is a test of the OneSignal notification system",
+                  { test: true, timestamp: Date.now() }
+                );
                 
-                if (response.ok) {
-                  console.log("✅ VAPID push notification sent");
+                if (oneSignalSuccess) {
+                  console.log("✅ OneSignal notification sent successfully");
+                  notificationLog("✅ OneSignal test notification sent");
                 } else {
-                  console.log("⚠️ VAPID push failed - using fallback notifications");
+                  console.log("⚠️ OneSignal failed, trying VAPID fallback");
+                  notificationLog("⚠️ OneSignal test failed, trying VAPID");
+                  
+                  // Fallback to VAPID test
+                  const response = await fetch('/api/notifications/push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      subscription: await getSubscription(),
+                      title: "🧪 Test Alert - VAPID Fallback",
+                      body: "This is a test of the VAPID push notification fallback",
+                      tag: "test-notification",
+                      url: "/signals"
+                    }),
+                  });
+                  
+                  if (response.ok) {
+                    console.log("✅ VAPID fallback sent");
+                    notificationLog("✅ VAPID fallback test sent");
+                  } else {
+                    console.log("❌ All notification systems failed");
+                    notificationLog("❌ All notification tests failed");
+                  }
                 }
               } catch (error) {
-                console.error("VAPID test failed:", error);
-                console.log("⚠️ VAPID test failed - fallback notifications active");
+                console.error("Notification test failed:", error);
+                notificationLog(`❌ Test failed: ${error.message}`);
               }
             }}
             className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-800/30"
