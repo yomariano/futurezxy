@@ -764,7 +764,7 @@ const PairsTable = () => {
     };
   }, []);
 
-  const handleIndicatorMessage = (data: IndicatorMessage) => {
+  const handleIndicatorMessage = async (data: IndicatorMessage) => {
     const signal = calculateSignal(data.wt1, settings);
 
     // Update timeframes if we receive a new one (fallback for new timeframes)
