@@ -15,6 +15,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useOneSignal } from "@/hooks/useOneSignal";
+import { useWebPush } from "@/hooks/useWebPush";
 import {
   Activity,
   Waves,
@@ -578,6 +579,12 @@ const testNotification = (playBellSound?: () => void) => {
 
 const PairsTable = () => {
   const { isClient, subscribeToNotifications, sendNotification } = useOneSignal();
+  const { 
+    isSupported: isWebPushSupported, 
+    subscribeToWebPush, 
+    sendWebPushNotification,
+    testWebPush 
+  } = useWebPush();
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -856,10 +863,31 @@ const PairsTable = () => {
             if (oneSignalSuccess) {
               notificationLog(`✅ OneSignal notification sent for ${data.symbol}`);
             } else {
-              notificationLog(`⚠️ OneSignal failed, trying VAPID fallback for ${data.symbol}`);
+              notificationLog(`⚠️ OneSignal failed, trying Web Push fallback for ${data.symbol}`);
               
-              // Fallback to VAPID push notification
-              const response = await fetch('/api/notifications/trigger', {
+              // Try Web Push API fallback first
+              const webPushSuccess = await sendWebPushNotification(
+                `${data.symbol} - ${triggerType} Signal`,
+                notificationMessage,
+                {
+                  symbol: data.symbol,
+                  timeframe: data.timeframe,
+                  triggerType,
+                  signal: signalToReport,
+                  wt1: data.wt1,
+                  wt2: data.wt2,
+                  price: data.price,
+                  timestamp: Date.now()
+                }
+              );
+
+              if (webPushSuccess) {
+                notificationLog(`✅ Web Push fallback sent for ${data.symbol}`);
+              } else {
+                notificationLog(`⚠️ Web Push failed, trying direct VAPID for ${data.symbol}`);
+                
+                // Final fallback to direct VAPID
+                const response = await fetch('/api/notifications/trigger', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -882,10 +910,11 @@ const PairsTable = () => {
                 }),
               });
 
-              if (response.ok) {
-                notificationLog(`✅ VAPID fallback sent for ${data.symbol}`);
-              } else {
-                notificationLog(`❌ All notifications failed for ${data.symbol}`);
+                if (response.ok) {
+                  notificationLog(`✅ VAPID fallback sent for ${data.symbol}`);
+                } else {
+                  notificationLog(`❌ All notifications failed for ${data.symbol}`);
+                }
               }
             }
           } catch (error: any) {
@@ -1697,6 +1726,25 @@ const PairsTable = () => {
             className="flex-shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-800/30"
           >
             🔔 Subscribe to Notifications
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              console.log("🌐 Testing Web Push...");
+              notificationLog("🧪 Testing Web Push notification system...");
+              const success = await testWebPush();
+              if (success) {
+                notificationLog("✅ Web Push test successful! Check your device.");
+                console.log("✅ Web Push test successful!");
+              } else {
+                notificationLog("❌ Web Push test failed. Check console for details.");
+                console.log("❌ Web Push test failed.");
+              }
+            }}
+            className="flex-shrink-0 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-800/30"
+          >
+            🌐 Test Web Push
           </Button>
           <Button
             variant="outline"

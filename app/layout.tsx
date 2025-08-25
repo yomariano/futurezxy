@@ -9,8 +9,11 @@ import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 
-// Dynamically import OneSignal provider to avoid SSR issues
+// Dynamically import providers to avoid SSR issues
 const OneSignalProvider = dynamic(() => import("@/components/OneSignalProvider"), {
+  ssr: false
+});
+const WebPushProvider = dynamic(() => import("@/components/WebPushProvider"), {
   ssr: false
 });
 
@@ -48,6 +51,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <OneSignalProvider />
+          <WebPushProvider />
           <ServiceWorkerRegistration />
           {isLandingPage ? (
             children
