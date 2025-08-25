@@ -1683,6 +1683,24 @@ const PairsTable = () => {
             variant="outline"
             size="sm"
             onClick={async () => {
+              console.log("🔔 Manual subscription attempt...");
+              const subscribed = await subscribeToNotifications();
+              if (subscribed) {
+                notificationLog("✅ Successfully subscribed to OneSignal notifications!");
+                console.log("✅ Successfully subscribed to OneSignal notifications!");
+              } else {
+                notificationLog("❌ Failed to subscribe to notifications. Check browser permissions.");
+                console.log("❌ Failed to subscribe to notifications. Check browser permissions.");
+              }
+            }}
+            className="flex-shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-800/30"
+          >
+            🔔 Subscribe to Notifications
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
               initAudioContext();
               playNotificationSound();
               console.log("🧪 Test notification triggered - Sound + OneSignal + VAPID");

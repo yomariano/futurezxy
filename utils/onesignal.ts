@@ -34,26 +34,41 @@ export const subscribeToNotifications = async () => {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal: any) {
       try {
+        console.log('🔔 Checking OneSignal subscription status...');
+        
         // Check if already subscribed
         const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
+        console.log('Current subscription status:', isSubscribed);
+        
         if (isSubscribed) {
-          console.log('Already subscribed to OneSignal');
+          console.log('✅ Already subscribed to OneSignal');
+          const userId = await OneSignal.User.onesignalId;
+          console.log('OneSignal User ID:', userId);
           resolve(true);
           return;
         }
 
-        // Request permission
-        const permission = await OneSignal.Notifications.requestPermission();
-        console.log('OneSignal permission:', permission);
+        // Check browser permission first
+        console.log('Browser notification permission:', Notification.permission);
         
-        if (permission) {
-          // Show slidedown prompt if permission granted
-          await OneSignal.slidedown.promptPush();
-          const finalSubscribed = await OneSignal.User.PushSubscription.optedIn;
-          resolve(finalSubscribed);
-        } else {
+        if (Notification.permission === 'denied') {
+          console.log('❌ Browser notifications are denied');
           resolve(false);
+          return;
         }
+
+        // Try to opt in the user (this will prompt for permission)
+        console.log('🔔 Prompting user for OneSignal subscription...');
+        await OneSignal.User.PushSubscription.optIn();
+        
+        // Check if subscription was successful
+        const finalSubscribed = await OneSignal.User.PushSubscription.optedIn;
+        const userId = await OneSignal.User.onesignalId;
+        
+        console.log('Final subscription status:', finalSubscribed);
+        console.log('OneSignal User ID:', userId);
+        
+        resolve(finalSubscribed);
       } catch (error) {
         console.error('OneSignal subscription error:', error);
         resolve(false);
