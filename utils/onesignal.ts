@@ -14,6 +14,7 @@ export const initOneSignal = () => {
     await OneSignal.init({
       appId: "f88d5ae4-e766-461f-bf00-90707c1b850e",
       safari_web_id: "web.onesignal.auto.2e77cfdc-f6e8-4572-82d4-363b6713f2bc",
+      serviceWorkerPath: '/OneSignalSDKWorker.js',
       notifyButton: {
         enable: false, // We'll handle subscription manually
       },
@@ -33,9 +34,26 @@ export const subscribeToNotifications = async () => {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal: any) {
       try {
-        await OneSignal.slidedown.promptPush();
+        // Check if already subscribed
         const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
-        resolve(isSubscribed);
+        if (isSubscribed) {
+          console.log('Already subscribed to OneSignal');
+          resolve(true);
+          return;
+        }
+
+        // Request permission
+        const permission = await OneSignal.Notifications.requestPermission();
+        console.log('OneSignal permission:', permission);
+        
+        if (permission) {
+          // Show slidedown prompt if permission granted
+          await OneSignal.slidedown.promptPush();
+          const finalSubscribed = await OneSignal.User.PushSubscription.optedIn;
+          resolve(finalSubscribed);
+        } else {
+          resolve(false);
+        }
       } catch (error) {
         console.error('OneSignal subscription error:', error);
         resolve(false);
