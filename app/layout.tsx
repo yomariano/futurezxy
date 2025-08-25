@@ -7,6 +7,12 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import MobileNav from "@/components/MobileNav";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
+
+// Dynamically import OneSignal provider to avoid SSR issues
+const OneSignalProvider = dynamic(() => import("@/components/OneSignalProvider"), {
+  ssr: false
+});
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,7 +34,6 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="FutureZXY" />
         <link rel="apple-touch-icon" href="/images/logo.png" />
-        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
       </head>
       <body
         className={cn(
@@ -42,6 +47,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <OneSignalProvider />
           <ServiceWorkerRegistration />
           {isLandingPage ? (
             children

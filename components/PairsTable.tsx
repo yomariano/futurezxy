@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { initOneSignal, subscribeToNotifications, sendNotification } from "@/utils/onesignal";
+import { useOneSignal } from "@/hooks/useOneSignal";
 import {
   Activity,
   Waves,
@@ -577,6 +577,7 @@ const testNotification = (playBellSound?: () => void) => {
 };
 
 const PairsTable = () => {
+  const { isClient, subscribeToNotifications, sendNotification } = useOneSignal();
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -700,8 +701,8 @@ const PairsTable = () => {
   // Add this useEffect to request notification permission and initialize audio on component mount
   useEffect(() => {
     const initNotifications = async () => {
-      // Initialize OneSignal first
-      initOneSignal();
+      // Only initialize on client side after SSR hydration
+      if (!isClient) return;
       
       // Try to subscribe to OneSignal notifications
       try {
@@ -762,7 +763,7 @@ const PairsTable = () => {
       document.removeEventListener('touchstart', handleUserInteraction);
       document.removeEventListener('keydown', handleUserInteraction);
     };
-  }, []);
+  }, [isClient, notificationLog, subscribeToNotifications]);
 
   const handleIndicatorMessage = async (data: IndicatorMessage) => {
     const signal = calculateSignal(data.wt1, settings);
