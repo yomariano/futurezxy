@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 const AddPairDialog = dynamic(() => import("@/components/AddPairDialog"), { ssr: false });
 const PairsTable = dynamic(() => import("@/components/PairsTable"), { ssr: false });
 const NotificationPermission = dynamic(() => import("@/components/NotificationPermission"), { ssr: false });
+const OneSignalTester = dynamic(() => import("@/components/OneSignalTester"), { ssr: false });
 
 export default function SignalsPage() {
   const handlePairAdded = (pair: any) => {
@@ -27,6 +28,8 @@ export default function SignalsPage() {
         </div>
 
         <NotificationPermission className="mb-6" />
+        
+        <OneSignalTester className="mb-6" />
 
         <PairsTable />
       </div>
