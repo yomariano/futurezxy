@@ -23,6 +23,8 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
   const [customTitle, setCustomTitle] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [isOneSignalReady, setIsOneSignalReady] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     checkPermissionStatus();
@@ -44,12 +46,24 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
         if (window.OneSignal) {
           setIsOneSignalReady(true);
           
-          // Check subscription status
-          window.OneSignal.User?.PushSubscription?.optedIn?.then?.((subscribed: boolean) => {
-            setIsSubscribed(subscribed);
-          }).catch((err: any) => {
+          // Check subscription status using OneSignal v16 API
+          try {
+            if (window.OneSignal.User && window.OneSignal.User.PushSubscription) {
+              // Check if optedIn is a property (v16 API)
+              if (typeof window.OneSignal.User.PushSubscription.optedIn !== 'undefined') {
+                setIsSubscribed(window.OneSignal.User.PushSubscription.optedIn);
+              } else if (typeof window.OneSignal.User.PushSubscription.getOptedInAsync === 'function') {
+                // Fallback to async method if available
+                window.OneSignal.User.PushSubscription.getOptedInAsync().then((subscribed: boolean) => {
+                  setIsSubscribed(subscribed);
+                }).catch((err: any) => {
+                  console.log("Could not check OneSignal subscription status:", err);
+                });
+              }
+            }
+          } catch (err) {
             console.log("Could not check OneSignal subscription status:", err);
-          });
+          }
         } else {
           // Check again in 100ms
           setTimeout(checkReady, 100);
@@ -169,6 +183,33 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
+  };
+
+  const collectDebugInfo = () => {
+    const info: any = {
+      browser: navigator.userAgent,
+      permission: Notification.permission,
+      isHTTPS: window.location.protocol === 'https:',
+      isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+      oneSignalReady: isOneSignalReady,
+      oneSignalExists: !!window.OneSignal,
+      serviceWorkerSupport: 'serviceWorker' in navigator,
+      pushSupport: 'PushManager' in window,
+      notificationSupport: 'Notification' in window,
+      timestamp: new Date().toISOString()
+    };
+
+    if (window.OneSignal && window.OneSignal.User) {
+      info.oneSignal = {
+        hasUser: !!window.OneSignal.User,
+        hasPushSubscription: !!window.OneSignal.User.PushSubscription,
+        optedIn: window.OneSignal.User.PushSubscription?.optedIn,
+        userId: window.OneSignal.User.onesignalId || 'Not available'
+      };
+    }
+
+    setDebugInfo(info);
+    setShowDebug(true);
   };
 
   return (
@@ -334,6 +375,49 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
               </div>
             </div>
 
+            {/* Debug Section */}
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                  🔧 Mobile Debug Tools
+                </h4>
+                <Button
+                  onClick={collectDebugInfo}
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoading}
+                >
+                  Collect Debug Info
+                </Button>
+              </div>
+
+              {showDebug && debugInfo && (
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Debug Information</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDebug(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <pre className="text-xs text-gray-600 dark:text-gray-300 overflow-auto max-h-40">
+                    {JSON.stringify(debugInfo, null, 2)}
+                  </pre>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-xs"
+                    onClick={() => navigator.clipboard?.writeText(JSON.stringify(debugInfo, null, 2))}
+                  >
+                    Copy to Clipboard
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Info Section */}
             <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
               <p className="font-medium mb-1">💡 How it works:</p>
@@ -342,6 +426,7 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
                 <li>• Test alerts show realistic trading signal examples</li>
                 <li>• The trading bot will also send automatic signals when detected</li>
                 <li>• Works on mobile phones, tablets, and desktop computers</li>
+                <li>• Use Debug Tools to diagnose mobile subscription issues</li>
               </ul>
             </div>
           </>
