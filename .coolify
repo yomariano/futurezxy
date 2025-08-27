@@ -1,0 +1,3 @@
+# Coolify configuration to force Dockerfile usage
+build_command=docker build -t $IMAGE_NAME .
+dockerfile=./Dockerfile

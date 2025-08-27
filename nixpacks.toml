@@ -1,0 +1,6 @@
+# Disable nixpacks auto-detection
+[build]
+cmd = "echo 'Use Dockerfile instead'"
+
+[start]  
+cmd = "echo 'This should not run - use Dockerfile'"
