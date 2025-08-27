@@ -45,6 +45,15 @@ export const subscribeToNotifications = async () => {
         
         if (isSafariIOS) {
           console.log('⚠️ Safari iOS detected - Push notifications may have limitations');
+          // Check iOS version for compatibility
+          const iosVersion = navigator.userAgent.match(/OS (\d+)_(\d+)/);
+          if (iosVersion) {
+            const majorVersion = parseInt(iosVersion[1]);
+            console.log(`iOS version: ${majorVersion}.${iosVersion[2]}`);
+            if (majorVersion < 16) {
+              console.warn('⚠️ iOS version may not support web push notifications');
+            }
+          }
         }
         
         // Check for HTTPS requirement
@@ -104,9 +113,33 @@ export const subscribeToNotifications = async () => {
         
         // Request browser permission first
         if (Notification.permission === 'default') {
+          console.log('Requesting browser notification permission...');
+          
+          // Add mobile-specific delay before permission request
+          if (isMobile) {
+            console.log('Mobile device detected, waiting 500ms before permission request...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
           const permission = await Notification.requestPermission();
+          console.log('Browser permission result:', permission);
+          
           if (permission !== 'granted') {
             console.log('❌ Browser permission denied');
+            
+            // Store specific error for mobile users
+            if (isMobile) {
+              (window as any).__lastNotificationError = {
+                error: 'Browser permission denied',
+                device: isSafariIOS ? 'Safari iOS' : isAndroid ? 'Android' : 'Mobile',
+                suggestion: isSafariIOS ? 
+                  'On Safari iOS: Go to Settings > Safari > Website Settings > Notifications, then allow for this site' :
+                  'Check your browser notification settings and ensure notifications are allowed',
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
             resolve(false);
             return;
           }
@@ -116,8 +149,26 @@ export const subscribeToNotifications = async () => {
         try {
           console.log('Attempting OneSignal v16 subscription...');
           
-          // Method 1: Try the v16 optIn method
-          if (OneSignal.User && OneSignal.User.PushSubscription && typeof OneSignal.User.PushSubscription.optIn === 'function') {
+          // Special handling for Safari iOS
+          if (isSafariIOS) {
+            console.log('Applying Safari iOS specific workarounds...');
+            
+            // iOS Safari requires a longer delay and specific method order
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Try to use the most compatible method for iOS
+            if (typeof OneSignal.showNativePrompt === 'function') {
+              console.log('Using OneSignal.showNativePrompt() for iOS Safari');
+              await OneSignal.showNativePrompt();
+            } else if (OneSignal.User && OneSignal.User.PushSubscription && typeof OneSignal.User.PushSubscription.optIn === 'function') {
+              console.log('Using OneSignal.User.PushSubscription.optIn() for iOS Safari');
+              await OneSignal.User.PushSubscription.optIn();
+            } else {
+              throw new Error('No iOS Safari compatible method found');
+            }
+          }
+          // Method 1: Try the v16 optIn method (for non-iOS)
+          else if (OneSignal.User && OneSignal.User.PushSubscription && typeof OneSignal.User.PushSubscription.optIn === 'function') {
             console.log('Using OneSignal.User.PushSubscription.optIn()');
             await OneSignal.User.PushSubscription.optIn();
           } 
@@ -147,17 +198,43 @@ export const subscribeToNotifications = async () => {
         } catch (subscriptionError) {
           console.error('OneSignal subscription method failed:', subscriptionError);
           
+          // Provide specific error information
+          let errorMessage = 'Unknown subscription error';
+          if (subscriptionError instanceof Error) {
+            errorMessage = subscriptionError.message;
+            
+            // Handle common mobile errors
+            if (errorMessage.includes('NotAllowedError')) {
+              errorMessage = 'Notifications blocked by user or browser policy';
+            } else if (errorMessage.includes('NotSupportedError')) {
+              errorMessage = 'Push notifications not supported on this device/browser';
+            } else if (errorMessage.includes('AbortError')) {
+              errorMessage = 'Subscription process was cancelled';
+            } else if (errorMessage.includes('Network')) {
+              errorMessage = 'Network error during subscription';
+            }
+          }
+          
+          console.error(`Subscription failed: ${errorMessage}`);
+          
           // Try one more fallback: direct browser notification request
           try {
             console.log('Trying direct browser notification as final fallback...');
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
-              throw new Error('Browser permission not granted');
+              throw new Error(`Browser permission not granted. Original error: ${errorMessage}`);
             }
             // If browser permission was granted, consider it a partial success
             console.log('Browser permission granted, but OneSignal subscription may have failed');
           } catch (browserError) {
             console.error('Browser fallback also failed:', browserError);
+            // Store the error for debugging
+            (window as any).__lastNotificationError = {
+              oneSignalError: errorMessage,
+              browserError: browserError instanceof Error ? browserError.message : 'Unknown browser error',
+              userAgent: navigator.userAgent,
+              timestamp: new Date().toISOString()
+            };
             resolve(false);
             return;
           }

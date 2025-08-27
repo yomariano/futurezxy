@@ -92,7 +92,23 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
         throw new Error("Failed to subscribe to notifications");
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to enable notifications";
+      let errorMessage = err instanceof Error ? err.message : "Failed to enable notifications";
+      
+      // Check for stored mobile-specific error information
+      const lastError = (window as any).__lastNotificationError;
+      if (lastError) {
+        errorMessage = `${lastError.error}${lastError.suggestion ? `. ${lastError.suggestion}` : ''}`;
+      }
+      
+      // Make error messages more user-friendly
+      if (errorMessage.includes('NotAllowedError') || errorMessage.includes('permission denied')) {
+        errorMessage = "Notifications blocked. Please check your browser settings and allow notifications for this site.";
+      } else if (errorMessage.includes('NotSupportedError')) {
+        errorMessage = "Your browser or device doesn't support push notifications.";
+      } else if (errorMessage.includes('Network')) {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      }
+      
       setError(errorMessage);
       console.error("Error subscribing to OneSignal:", err);
     } finally {
@@ -198,6 +214,23 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
       notificationSupport: 'Notification' in window,
       timestamp: new Date().toISOString()
     };
+
+    // Add iOS version detection
+    const iosMatch = navigator.userAgent.match(/OS (\d+)_(\d+)/);
+    if (iosMatch) {
+      info.iosVersion = `${iosMatch[1]}.${iosMatch[2]}`;
+    }
+
+    // Add Chrome version detection
+    const chromeMatch = navigator.userAgent.match(/Chrome\/(\d+)/);
+    if (chromeMatch) {
+      info.chromeVersion = chromeMatch[1];
+    }
+
+    // Add last error information if available
+    if ((window as any).__lastNotificationError) {
+      info.lastError = (window as any).__lastNotificationError;
+    }
 
     if (window.OneSignal && window.OneSignal.User) {
       info.oneSignal = {
