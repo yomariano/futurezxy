@@ -31,6 +31,18 @@ export const subscribeToNotifications = async () => {
   
   // Wait for OneSignal to be ready
   return new Promise((resolve) => {
+    // Add overall timeout to prevent hanging
+    const overallTimeout = setTimeout(() => {
+      console.error('⏰ Subscription process timed out after 30 seconds');
+      (window as any).__lastNotificationError = {
+        error: 'Subscription timed out',
+        suggestion: 'The subscription process took too long. Try refreshing the page and trying again.',
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      };
+      resolve(false);
+    }, 30000); // 30 second timeout
+
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal: any) {
       try {
@@ -121,7 +133,14 @@ export const subscribeToNotifications = async () => {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
           
-          const permission = await Notification.requestPermission();
+          // Add timeout for permission request to prevent hanging
+          console.log('Requesting notification permission...');
+          const permission = await Promise.race([
+            Notification.requestPermission(),
+            new Promise<NotificationPermission>((_, reject) => 
+              setTimeout(() => reject(new Error('Permission request timed out')), 10000)
+            )
+          ]);
           console.log('Browser permission result:', permission);
           
           if (permission !== 'granted') {
@@ -156,13 +175,23 @@ export const subscribeToNotifications = async () => {
             // iOS Safari requires a longer delay and specific method order
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Try to use the most compatible method for iOS
+            // Try to use the most compatible method for iOS with timeout
             if (typeof OneSignal.showNativePrompt === 'function') {
               console.log('Using OneSignal.showNativePrompt() for iOS Safari');
-              await OneSignal.showNativePrompt();
+              await Promise.race([
+                OneSignal.showNativePrompt(),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('iOS native prompt timed out')), 15000)
+                )
+              ]);
             } else if (OneSignal.User && OneSignal.User.PushSubscription && typeof OneSignal.User.PushSubscription.optIn === 'function') {
               console.log('Using OneSignal.User.PushSubscription.optIn() for iOS Safari');
-              await OneSignal.User.PushSubscription.optIn();
+              await Promise.race([
+                OneSignal.User.PushSubscription.optIn(),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('iOS optIn timed out')), 15000)
+                )
+              ]);
             } else {
               throw new Error('No iOS Safari compatible method found');
             }
@@ -170,27 +199,52 @@ export const subscribeToNotifications = async () => {
           // Method 1: Try the v16 optIn method (for non-iOS)
           else if (OneSignal.User && OneSignal.User.PushSubscription && typeof OneSignal.User.PushSubscription.optIn === 'function') {
             console.log('Using OneSignal.User.PushSubscription.optIn()');
-            await OneSignal.User.PushSubscription.optIn();
+            await Promise.race([
+              OneSignal.User.PushSubscription.optIn(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('optIn method timed out')), 15000)
+              )
+            ]);
           } 
           // Method 2: Try slidedown prompt (mobile-friendly)
           else if (typeof OneSignal.showSlidedownPrompt === 'function') {
             console.log('Using OneSignal.showSlidedownPrompt()');
-            await OneSignal.showSlidedownPrompt();
+            await Promise.race([
+              OneSignal.showSlidedownPrompt(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('slidedown prompt timed out')), 15000)
+              )
+            ]);
           }
           // Method 3: Try native prompt (works on mobile)
           else if (typeof OneSignal.showNativePrompt === 'function') {
             console.log('Using OneSignal.showNativePrompt()');
-            await OneSignal.showNativePrompt();
+            await Promise.race([
+              OneSignal.showNativePrompt(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('native prompt timed out')), 15000)
+              )
+            ]);
           }
           // Method 4: Legacy registration method
           else if (typeof OneSignal.registerForPushNotifications === 'function') {
             console.log('Using OneSignal.registerForPushNotifications()');
-            await OneSignal.registerForPushNotifications();
+            await Promise.race([
+              OneSignal.registerForPushNotifications(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('registerForPushNotifications timed out')), 15000)
+              )
+            ]);
           }
           // Method 5: Direct service worker registration (last resort)
           else if (typeof OneSignal.requestPermission === 'function') {
             console.log('Using OneSignal.requestPermission()');
-            await OneSignal.requestPermission();
+            await Promise.race([
+              OneSignal.requestPermission(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('requestPermission timed out')), 15000)
+              )
+            ]);
           }
           else {
             throw new Error('No compatible OneSignal subscription method found');
@@ -289,9 +343,13 @@ export const subscribeToNotifications = async () => {
           console.log('❌ OneSignal subscription failed');
         }
         
+        // Clear the timeout since we completed successfully
+        clearTimeout(overallTimeout);
         resolve(success);
       } catch (error) {
         console.error('OneSignal subscription error:', error);
+        // Clear the timeout since we completed (even with error)
+        clearTimeout(overallTimeout);
         resolve(false);
       }
     });

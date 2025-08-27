@@ -25,6 +25,8 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
   const [isOneSignalReady, setIsOneSignalReady] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<string>('');
+  const [subscriptionController, setSubscriptionController] = useState<AbortController | null>(null);
 
   useEffect(() => {
     checkPermissionStatus();
@@ -77,12 +79,35 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
   };
 
   const handleSubscribe = async () => {
+    if (isLoading) return; // Prevent multiple clicks
+    
     setIsLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      const result = await subscribeToNotifications();
+      console.log('Starting subscription process...');
+      setLoadingStep('Initializing OneSignal...');
+      
+      // Create an abort controller for manual cancellation
+      const controller = new AbortController();
+      setSubscriptionController(controller);
+      
+      // Add a timeout wrapper around the subscription
+      const subscriptionPromise = subscribeToNotifications();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Subscription process timed out after 35 seconds'));
+        }, 35000);
+      });
+      
+      const abortPromise = new Promise((_, reject) => {
+        controller.signal.addEventListener('abort', () => {
+          reject(new Error('Subscription cancelled by user'));
+        });
+      });
+
+      const result = await Promise.race([subscriptionPromise, timeoutPromise, abortPromise]);
       
       if (result) {
         setIsSubscribed(true);
@@ -113,6 +138,8 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
       console.error("Error subscribing to OneSignal:", err);
     } finally {
       setIsLoading(false);
+      setLoadingStep('');
+      setSubscriptionController(null);
     }
   };
 
@@ -199,6 +226,13 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
+  };
+
+  const handleCancelSubscription = () => {
+    if (subscriptionController) {
+      subscriptionController.abort();
+      setError('Subscription process was cancelled');
+    }
   };
 
   const collectDebugInfo = () => {
@@ -297,23 +331,37 @@ export function OneSignalTester({ className }: OneSignalTesterProps) {
         {/* Subscription Section */}
         {!isSubscribed ? (
           <div className="space-y-4">
-            <Button
-              onClick={handleSubscribe}
-              disabled={isLoading || permission === "denied" || !isOneSignalReady}
-              className="w-full sm:w-auto"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Subscribing...
-                </>
-              ) : (
-                <>
-                  <Bell className="mr-2 h-4 w-4" />
-                  Subscribe to OneSignal
-                </>
+            <div className="flex gap-2 flex-col sm:flex-row">
+              <Button
+                onClick={handleSubscribe}
+                disabled={isLoading || permission === "denied" || !isOneSignalReady}
+                className="flex-1 sm:w-auto"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {loadingStep || 'Subscribing...'}
+                  </>
+                ) : (
+                  <>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Subscribe to OneSignal
+                  </>
+                )}
+              </Button>
+
+              {isLoading && subscriptionController && (
+                <Button
+                  onClick={handleCancelSubscription}
+                  variant="outline"
+                  size="sm"
+                  className="sm:w-auto"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
               )}
-            </Button>
+            </div>
 
             {permission === "denied" && (
               <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md">
