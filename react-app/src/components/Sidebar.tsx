@@ -1,5 +1,5 @@
 import { LineChart, Settings, PanelLeftClose, PanelLeft, BarChart2Icon, SettingsIcon, CreditCardIcon, LogOut, Lock } from "lucide-react"
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabaseClient'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Link } from "react-router-dom"
 import { cn } from "../lib/utils"
@@ -30,7 +30,6 @@ const sidebarItems = [
 export function Sidebar({ isMobile = false }: { isMobile?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const supabase = createClient(process.env.REACT_APP_SUPABASE_URL!, process.env.REACT_APP_SUPABASE_ANON_KEY!)
   const pathname = location.pathname
   const [isCollapsed, setIsCollapsed] = useState(false)
 

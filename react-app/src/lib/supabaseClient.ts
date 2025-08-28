@@ -1,30 +1,18 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-
-// Get environment variables from runtime config or build-time env
-const getEnvVar = (key: string): string | undefined => {
-  // First try runtime config (window.ENV)
-  if (typeof window !== 'undefined' && (window as any).ENV && (window as any).ENV[key]) {
-    const value = (window as any).ENV[key];
-    // Check if it's not a placeholder
-    if (value && !value.startsWith('__') && !value.endsWith('__')) {
-      return value;
-    }
-  }
-  // Fallback to build-time env
-  return import.meta.env[key];
-};
+import { env } from './env'
 
 // Export a function to create new client instances
 export const createClient = () => {
-  const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
-  const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Environment variables:', {
       supabaseUrl: supabaseUrl ? 'Set' : 'Missing',
       supabaseAnonKey: supabaseAnonKey ? 'Set' : 'Missing',
       windowENV: typeof window !== 'undefined' ? (window as any).ENV : 'Not available',
-      importMetaEnv: import.meta.env
+      importMetaEnv: import.meta.env,
+      env: env
     });
     throw new Error('Supabase URL and anon key are required. Please check your environment variables.');
   }
@@ -42,12 +30,20 @@ export const getSupabase = () => {
   return _supabase;
 }
 
-// For immediate backward compatibility (might fail at build time, but that's expected)
-export const supabase = (() => {
-  try {
-    return createClient();
-  } catch {
-    // Return a placeholder that will throw at runtime if used
-    return null as any;
+// Lazy getter that creates client on first access
+let _directSupabase: ReturnType<typeof createClient> | null = null;
+
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(target, prop, receiver) {
+    if (!_directSupabase) {
+      _directSupabase = createClient();
+    }
+    return Reflect.get(_directSupabase, prop, receiver);
+  },
+  set(target, prop, value, receiver) {
+    if (!_directSupabase) {
+      _directSupabase = createClient();
+    }
+    return Reflect.set(_directSupabase, prop, value, receiver);
   }
-})();
+});

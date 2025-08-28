@@ -8,6 +8,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Initialize ENV with defaults to prevent errors
+      window.ENV = window.ENV || {
+        VITE_SUPABASE_URL: '',
+        VITE_SUPABASE_ANON_KEY: '',
+        VITE_API_URL: '',
+        VITE_OPENBB_API_KEY: ''
+      };
+    </script>
     <script src="/config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
