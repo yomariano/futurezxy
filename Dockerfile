@@ -39,24 +39,38 @@ COPY --from=builder /app/dist /usr/share/nginx/html/
 # List copied files for debugging
 RUN echo "Files in nginx html directory:" && ls -la /usr/share/nginx/html/
 
-# Remove default nginx config and create new one
-RUN rm -f /etc/nginx/conf.d/default.conf && \
-    echo 'server { \
-    listen 80; \
-    listen [::]:80; \
-    server_name _; \
-    root /usr/share/nginx/html; \
-    index index.html index.htm; \
-    \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-    \
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Create custom nginx config for SPA
+RUN cat > /etc/nginx/conf.d/default.conf <<'EOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+    
+    root /usr/share/nginx/html;
+    index index.html;
+    
+    # SPA routing - all routes go to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+    gzip_vary on;
+}
+EOF
 
 # Expose port 80
 EXPOSE 80

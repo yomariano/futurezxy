@@ -1,0 +1,12 @@
+{
+  "buildPack": "dockerfile",
+  "port": 80,
+  "exposePort": 80,
+  "healthcheck": {
+    "enabled": true,
+    "path": "/",
+    "interval": 30,
+    "timeout": 3,
+    "retries": 3
+  }
+}
