@@ -21,15 +21,23 @@ RUN npm install
 COPY react-app/ .
 
 # Build the application (skip TypeScript checks for now)
-RUN npx vite build --mode production
+RUN npx vite build --mode production && \
+    echo "Build complete, checking output:" && \
+    ls -la /app/dist/
 
 # Production stage with nginx
 FROM nginx:alpine
 
 LABEL description="Production stage for FutureZXY React app"
 
+# Remove default nginx files
+RUN rm -rf /usr/share/nginx/html/*
+
 # Copy built files from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html/
+
+# List copied files for debugging
+RUN echo "Files in nginx html directory:" && ls -la /usr/share/nginx/html/
 
 # Create nginx configuration for SPA
 RUN echo 'server { \
