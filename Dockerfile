@@ -13,6 +13,8 @@ RUN apk add --no-cache git python3 make g++ curl
 
 # Copy package files from react-app directory  
 COPY react-app/package-node18.json ./package.json
+COPY react-app/postcss.config.js ./postcss.config.js
+COPY react-app/tailwind.config.js ./tailwind.config.js
 
 # Install dependencies (including dev dependencies for build)
 RUN npm install
