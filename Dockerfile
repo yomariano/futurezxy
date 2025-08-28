@@ -39,28 +39,23 @@ COPY --from=builder /app/dist /usr/share/nginx/html/
 # List copied files for debugging
 RUN echo "Files in nginx html directory:" && ls -la /usr/share/nginx/html/
 
-# Create nginx configuration for SPA
-RUN echo 'server { \
+# Remove default nginx config and create new one
+RUN rm -f /etc/nginx/conf.d/default.conf && \
+    echo 'server { \
     listen 80; \
-    server_name localhost; \
+    listen [::]:80; \
+    server_name _; \
     root /usr/share/nginx/html; \
-    index index.html; \
+    index index.html index.htm; \
     \
-    # Handle client-side routing \
     location / { \
         try_files $uri $uri/ /index.html; \
     } \
     \
-    # Cache static assets \
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ { \
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { \
         expires 1y; \
         add_header Cache-Control "public, immutable"; \
     } \
-    \
-    # Security headers \
-    add_header X-Frame-Options "SAMEORIGIN" always; \
-    add_header X-Content-Type-Options "nosniff" always; \
-    add_header Referrer-Policy "no-referrer-when-downgrade" always; \
 }' > /etc/nginx/conf.d/default.conf
 
 # Expose port 80

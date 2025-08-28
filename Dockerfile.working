@@ -1,0 +1,28 @@
+# Working Dockerfile for React app
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache git python3 make g++
+
+# Copy and install dependencies
+COPY react-app/package-node18.json ./package.json
+RUN npm install
+
+# Copy source and build
+COPY react-app/ .
+RUN npx vite build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built app
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Test that files exist
+RUN test -f /usr/share/nginx/html/index.html || (echo "ERROR: index.html not found!" && exit 1)
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

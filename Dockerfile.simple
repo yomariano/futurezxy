@@ -1,0 +1,10 @@
+# Simple test Dockerfile to diagnose 502 error
+FROM nginx:alpine
+
+# Create a simple test HTML file
+RUN echo '<!DOCTYPE html><html><head><title>Test</title></head><body><h1>Nginx Works!</h1><p>If you see this, nginx is running correctly.</p></body></html>' > /usr/share/nginx/html/index.html
+
+# Use default nginx config
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
