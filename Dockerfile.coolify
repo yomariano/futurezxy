@@ -1,0 +1,29 @@
+# Simplified Dockerfile specifically for Coolify
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy and install dependencies
+COPY react-app/package-node18.json ./package.json
+RUN npm install
+
+# Copy source and build
+COPY react-app/ .
+RUN npx vite build --mode production
+
+# Production stage - using node instead of nginx
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install serve to run the app
+RUN npm install -g serve
+
+# Copy built files
+COPY --from=builder /app/dist ./dist
+
+# Expose port 3000 (serve default)
+EXPOSE 3000
+
+# Run with serve on port 3000
+CMD ["serve", "-s", "dist", "-l", "3000"]

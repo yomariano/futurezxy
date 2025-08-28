@@ -25,59 +25,28 @@ RUN npx vite build --mode production && \
     echo "Build complete, checking output:" && \
     ls -la /app/dist/
 
-# Production stage with nginx
-FROM nginx:alpine
+# Production stage - Using Node with serve for better Coolify compatibility
+FROM node:18-alpine
 
 LABEL description="Production stage for FutureZXY React app"
 
-# Remove default nginx files
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /app
+
+# Install serve globally
+RUN npm install -g serve
 
 # Copy built files from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html/
+COPY --from=builder /app/dist ./dist
 
 # List copied files for debugging
-RUN echo "Files in nginx html directory:" && ls -la /usr/share/nginx/html/
+RUN echo "Files in dist directory:" && ls -la /app/dist/
 
-# Create custom nginx config for SPA
-RUN cat > /etc/nginx/conf.d/default.conf <<'EOF'
-server {
-    listen 80;
-    listen [::]:80;
-    server_name _;
-    
-    root /usr/share/nginx/html;
-    index index.html;
-    
-    # SPA routing - all routes go to index.html
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    
-    # Gzip compression
-    gzip on;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-    gzip_vary on;
-}
-EOF
+# Use port 3000 which Coolify handles better
+EXPOSE 3000
 
-# Expose port 80
-EXPOSE 80
-
-# Health check
+# Health check on port 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start serve on port 3000 with SPA mode
+CMD ["serve", "-s", "dist", "-l", "3000"]
