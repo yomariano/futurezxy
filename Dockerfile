@@ -22,6 +22,18 @@ RUN npm install
 # Copy react-app source code
 COPY react-app/ .
 
+# Accept build arguments for environment variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_URL
+ARG VITE_OPENBB_API_KEY
+
+# Set environment variables for the build
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_OPENBB_API_KEY=${VITE_OPENBB_API_KEY}
+
 # Build the application (skip TypeScript checks for now)
 RUN npx vite build --mode production && \
     echo "Build complete, checking output:" && \
