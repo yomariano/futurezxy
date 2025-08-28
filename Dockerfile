@@ -26,7 +26,9 @@ COPY react-app/ .
 # No need for build-time env vars anymore
 RUN npx vite build --mode production && \
     echo "Build complete, checking output:" && \
-    ls -la /app/dist/
+    ls -la /app/dist/ && \
+    echo "Checking for config.js:" && \
+    ls -la /app/dist/config.js || echo "config.js not found in dist"
 
 # Production stage - Using Node with serve for better Coolify compatibility
 FROM node:18-alpine
