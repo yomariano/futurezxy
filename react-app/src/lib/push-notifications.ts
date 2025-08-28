@@ -18,7 +18,9 @@ export interface NotificationPayload {
   data?: Record<string, any>;
 }
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+const VAPID_PUBLIC_KEY = typeof window !== 'undefined' 
+  ? ((window as any).ENV?.VITE_VAPID_PUBLIC_KEY || import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc')
+  : 'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc'
 
 /**
  * Check if push notifications are supported in the current browser

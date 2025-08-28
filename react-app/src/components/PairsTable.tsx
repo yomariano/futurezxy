@@ -489,7 +489,7 @@ const subscribeToPushNotifications = async (registration: ServiceWorkerRegistrat
   if (typeof window === 'undefined') return; // SSR guard
   
   try {
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc';
+    const vapidPublicKey = (window as any).ENV?.VITE_VAPID_PUBLIC_KEY || import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc';
     
     if (!vapidPublicKey) {
       console.warn("VAPID public key not found");
@@ -1044,7 +1044,7 @@ const PairsTable = () => {
 
     try {
       // Ensure we always use the correct WebSocket URL
-      const envUrl = process.env.NEXT_PUBLIC_WS_URL;
+      const envUrl = (window as any).ENV?.VITE_WS_URL || import.meta.env.VITE_WS_URL;
       const defaultUrl = "wss://api.signalstrading.app";
       
       // Force correct URL if environment variable is incorrect

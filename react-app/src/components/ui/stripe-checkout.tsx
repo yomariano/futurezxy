@@ -37,7 +37,8 @@ export function StripeCheckout({ isOpen, onClose, plan }: StripeCheckoutProps) {
       const { sessionId } = await response.json()
 
       // Redirect to Stripe Checkout
-      const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+      const stripeKey = (window as any).ENV?.VITE_STRIPE_PUBLISHABLE_KEY || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
+      const stripe = await loadStripe(stripeKey)
       await stripe?.redirectToCheckout({ sessionId })
       
     } catch (error) {

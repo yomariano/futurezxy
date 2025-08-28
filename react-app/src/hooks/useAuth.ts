@@ -11,7 +11,7 @@ export function useAuth() {
     if (
       typeof window !== "undefined" &&
       window.location.hostname === "localhost" &&
-      process.env.NODE_ENV === "development"
+      import.meta.env.MODE === "development"
     ) {
       // Create a mock user for localhost development only
       const mockUser = {

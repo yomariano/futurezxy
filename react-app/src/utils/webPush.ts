@@ -33,8 +33,10 @@ export const subscribeToWebPush = async (): Promise<boolean> => {
   try {
     console.log('🔔 Starting Web Push subscription process...');
     
-    // Check VAPID key
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    // Check VAPID key - use env helper for runtime access
+    const vapidKey = (window as any).ENV?.VITE_VAPID_PUBLIC_KEY || 
+                     import.meta.env.VITE_VAPID_PUBLIC_KEY ||
+                     'BDY9PUZxO1S3O9bJ7-nekjUIFcmQj2ViMYy6Gk30Kytfr4p3l5ii4g55YNqvyqqvvDS938raycn57HzhVinmcJc';
     console.log('VAPID key available:', !!vapidKey);
     console.log('VAPID key (first 20 chars):', vapidKey?.substring(0, 20));
     

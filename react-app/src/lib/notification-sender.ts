@@ -29,9 +29,10 @@ export async function sendBulkNotification(
     console.log('📝 Payload to send:', payload);
 
     // Get all subscriptions from the subscribe endpoint
-    const subscriptionsUrl = `${
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    }/api/notifications/subscribe`;
+    const appUrl = typeof window !== 'undefined' 
+      ? ((window as any).ENV?.VITE_APP_URL || import.meta.env.VITE_APP_URL || "http://localhost:3000")
+      : "http://localhost:3000";
+    const subscriptionsUrl = `${appUrl}/api/notifications/subscribe`;
     
     console.log('📡 Fetching from:', subscriptionsUrl);
 
@@ -69,9 +70,7 @@ export async function sendBulkNotification(
 
     // Send bulk notification
     const notificationResponse = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      }/api/notifications`,
+      `${appUrl}/api/notifications`,
       {
         method: "POST",
         headers: {
