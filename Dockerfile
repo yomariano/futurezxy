@@ -22,19 +22,8 @@ RUN npm install
 # Copy react-app source code
 COPY react-app/ .
 
-# Accept build arguments for environment variables
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-ARG VITE_API_URL
-ARG VITE_OPENBB_API_KEY
-
-# Set environment variables for the build
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-ENV VITE_API_URL=${VITE_API_URL}
-ENV VITE_OPENBB_API_KEY=${VITE_OPENBB_API_KEY}
-
 # Build the application (skip TypeScript checks for now)
+# No need for build-time env vars anymore
 RUN npx vite build --mode production && \
     echo "Build complete, checking output:" && \
     ls -la /app/dist/
@@ -52,6 +41,10 @@ RUN npm install -g serve
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # List copied files for debugging
 RUN echo "Files in dist directory:" && ls -la /app/dist/
 
@@ -62,5 +55,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
 
-# Start serve on port 3000 with SPA mode
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Use entrypoint to inject env vars at runtime
+ENTRYPOINT ["/entrypoint.sh"]
