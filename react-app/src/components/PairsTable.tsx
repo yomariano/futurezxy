@@ -14,6 +14,7 @@ import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { useOneSignal } from "../hooks/useOneSignal";
 import { useWebPush } from "../hooks/useWebPush";
+import { addMissingDefaultPairs, DEFAULT_PAIRS } from "../utils/addDefaultPairs";
 import {
   Activity,
   Waves,
@@ -27,6 +28,7 @@ import {
   Pin,
   Settings,
   Trash2,
+  PlusCircle,
 } from "lucide-react";
 import {
   Tooltip,
@@ -617,6 +619,7 @@ const PairsTable = () => {
     timestamp: number;
     type: 'buy' | 'sell' | 'info';
   }>>([]);
+  const [isAddingDefaultPairs, setIsAddingDefaultPairs] = useState(false);
 
   // Custom notification logging function that shows push notifications on screen
   const notificationLog = useCallback((message: string, data?: any) => {
@@ -1639,6 +1642,46 @@ const PairsTable = () => {
     playBell?.();
   };
 
+  const handleAddDefaultPairs = async () => {
+    setIsAddingDefaultPairs(true);
+    notificationLog(`📦 Adding default pairs: ${DEFAULT_PAIRS.join(', ')}`);
+    
+    try {
+      const result = await addMissingDefaultPairs();
+      
+      if (result.added.length > 0) {
+        notificationLog(`✅ Successfully added ${result.added.length} pairs: ${result.added.join(', ')}`);
+        // Reload pairs to show the new ones
+        await loadPairs();
+      }
+      
+      if (result.skipped.length > 0) {
+        notificationLog(`⏭️ Skipped ${result.skipped.length} existing pairs: ${result.skipped.join(', ')}`);
+      }
+      
+      if (result.failed.length > 0) {
+        notificationLog(`❌ Failed to add ${result.failed.length} pairs: ${result.failed.join(', ')}`);
+        Object.entries(result.errors).forEach(([symbol, error]) => {
+          notificationLog(`  ❌ ${symbol}: ${error}`);
+        });
+      }
+      
+      // Show success message
+      if (result.added.length > 0) {
+        showNotification(
+          'Default Pairs Added',
+          `Successfully added ${result.added.length} new trading pairs`,
+          'info'
+        );
+      }
+    } catch (error) {
+      console.error('Error adding default pairs:', error);
+      notificationLog(`❌ Error adding default pairs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAddingDefaultPairs(false);
+    }
+  };
+
   // Modify saveSettings to include debugging
   const saveSettings = (newSettings: WaveTrendSettings) => {
     console.log("Saving new settings:", newSettings);
@@ -1706,6 +1749,22 @@ const PairsTable = () => {
             className="flex-shrink-0"
           >
 {showNotificationConsole ? "Hide Notifications" : "Show Notifications"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAddDefaultPairs}
+            disabled={isAddingDefaultPairs}
+            className="flex-shrink-0 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-800/30"
+          >
+            {isAddingDefaultPairs ? (
+              <>Adding Pairs...</>
+            ) : (
+              <>
+                <PlusCircle className="h-4 w-4 mr-1" />
+                Add Default Pairs
+              </>
+            )}
           </Button>
           <Button
             variant="outline"
