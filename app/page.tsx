@@ -1,14 +1,16 @@
 'use client'
 import Link from 'next/link'
+import { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronRight, BarChart2, TrendingUp, AlertCircle, Zap, Lock, CheckCircle2, LineChart, Smartphone, BookOpen, Unlock, Crown, User } from 'lucide-react'
+import { ChevronRight, BarChart2, TrendingUp, AlertCircle, Zap, Lock, CheckCircle2, LineChart, Smartphone, BookOpen, Unlock, Crown, User, Menu, X, Sparkles } from 'lucide-react'
 import AuthButton from '@/components/AuthButton'
 import BypassAuthButton from '@/components/BypassAuthButton'
 import { useRouter } from 'next/navigation'
 
 export default function Component() {
   const router = useRouter()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleGetStarted = () => {
     // 🚫🔐 AUTH COMPLETELY BYPASSED - Direct redirect to signals page
@@ -35,6 +37,12 @@ export default function Component() {
               <span className="hidden font-bold sm:inline-block">FutureSignals</span>
             </Link>
             <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+              <Link className="transition-colors hover:text-foreground/80 text-foreground/60" href="/dashboard">
+                Dashboard
+              </Link>
+              <Link className="transition-colors hover:text-foreground/80 text-foreground/60" href="/image-combine">
+                AI Image Combiner
+              </Link>
               <Link className="transition-colors hover:text-foreground/80 text-foreground/60" href="#features">
                 Features
               </Link>
@@ -47,12 +55,64 @@ export default function Component() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
             <AuthButton />
             <BypassAuthButton className="bg-primary text-primary-foreground hover:bg-primary/90">
               Get Started (No Auth)
             </BypassAuthButton>
           </div>
         </div>
+        
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-b bg-background">
+            <nav className="flex flex-col space-y-2 p-4">
+              <Link 
+                className="transition-colors hover:text-foreground/80 text-foreground/60 py-2" 
+                href="/dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link 
+                className="flex items-center gap-2 transition-colors hover:text-foreground/80 text-foreground/60 py-2" 
+                href="/image-combine"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Image Combiner
+              </Link>
+              <Link 
+                className="transition-colors hover:text-foreground/80 text-foreground/60 py-2" 
+                href="#features"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Features
+              </Link>
+              <Link 
+                className="transition-colors hover:text-foreground/80 text-foreground/60 py-2" 
+                href="#pricing"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Pricing
+              </Link>
+              <Link 
+                className="transition-colors hover:text-foreground/80 text-foreground/60 py-2" 
+                href="#testimonials"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Testimonials
+              </Link>
+            </nav>
+          </div>
+        )}
       </header>
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">

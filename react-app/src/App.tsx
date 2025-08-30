@@ -3,6 +3,7 @@ import { ThemeProvider } from './components/ThemeProvider'
 import DashboardLayout from './components/layouts/DashboardLayout'
 import MobileNav from './components/MobileNav'
 import HomePage from './pages/HomePage'
+import DashboardPage from './pages/DashboardPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SignalsPage from './pages/SignalsPage'
 import BillingPage from './pages/BillingPage'
@@ -23,6 +24,7 @@ function App() {
                 <DashboardLayout>
                   <main className="md:pl-64 pb-16 md:pb-0 min-w-0">
                     <Routes>
+                      <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/analytics" element={<AnalyticsPage />} />
                       <Route path="/signals" element={<SignalsPage />} />
                       <Route path="/billing" element={<BillingPage />} />
