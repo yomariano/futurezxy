@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Activity, Waves, LineChart, BarChart2, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, Bell, Pin, Settings } from "lucide-react";
+import { Activity, Waves, LineChart, Bell, Pin, Settings } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -78,8 +78,6 @@ interface TradingPair {
 
 // Modify calculateSignal to accept settings as a parameter
 const calculateSignal = (wt: number, settings: WaveTrendSettings): SignalType => {
-  console.log('Calculating signal:', { wt, settings });
-  
   const TRANSITION_PERCENTAGE = 0.05;
   
   const buyTransitionZone = settings.buyThreshold + (Math.abs(settings.buyThreshold) * TRANSITION_PERCENTAGE);
@@ -217,15 +215,10 @@ const PINNED_PAIRS_KEY = 'pinnedPairs';
 
 // Add this near your other utility functions
 const showNotification = (symbol: string, message: string) => {
-  console.log('Attempting to show notification:', { symbol, message });
-  
   if ('Notification' in window) {
-    console.log('Notification permission:', Notification.permission);
-    
     if (Notification.permission === 'granted') {
       const notificationSettings = JSON.parse(localStorage.getItem(NOTIFICATION_SETTINGS_KEY) || '{}');
-      console.log('Notification settings:', notificationSettings);
-      
+
       if (notificationSettings[symbol]) {
         try {
           const notification = new Notification(`${symbol} Trading Alert 📈`, {
@@ -241,15 +234,12 @@ const showNotification = (symbol: string, message: string) => {
             window.focus();
             notification.close();
           };
-
-          console.log('Notification sent successfully');
-        } catch (error) {
-          console.error('Error sending notification:', error);
+        } catch {
+          // Notification failed silently
         }
       }
     } else if (Notification.permission !== 'denied') {
       Notification.requestPermission().then(permission => {
-        console.log('Permission requested:', permission);
         if (permission === 'granted') {
           showNotification(symbol, message);
         }
@@ -263,26 +253,23 @@ const testNotification = (playBellSound?: () => void) => {
   if ('Notification' in window) {
     if (Notification.permission === 'granted') {
       try {
-        // Create notification with supported options
         const notification = new Notification('Trading Alert 📈', {
           body: 'This is a test trading notification',
           icon: '/favicon.ico',
           badge: '/favicon.ico',
           tag: 'test-notification',
-          requireInteraction: true, // Notification persists until user interacts
-          silent: false, // Allow system sound
+          requireInteraction: true,
+          silent: false,
         });
 
-        // Add click handler
         notification.onclick = () => {
           window.focus();
           notification.close();
         };
 
-        // Play custom sound
         playBellSound?.();
-      } catch (error) {
-        console.error('Error sending test notification:', error);
+      } catch {
+        // Notification failed silently
       }
     } else if (Notification.permission !== 'denied') {
       Notification.requestPermission().then(permission => {
@@ -291,7 +278,6 @@ const testNotification = (playBellSound?: () => void) => {
         }
       });
     } else {
-      // If notifications are denied, show a message to the user
       alert('Please enable notifications in your browser settings to receive trading alerts.');
     }
   }
@@ -307,8 +293,8 @@ const MemoizedIndicators = memo(({ pair, timeframe, settings }: {
   
   if (!indicator) {
     return (
-      <div className="text-muted-foreground">
-        <Activity className="w-4 h-4 animate-pulse" />
+      <div className="text-muted-foreground" aria-label="Loading indicator data">
+        <Activity aria-hidden="true" className="w-4 h-4 motion-safe:animate-pulse" />
       </div>
     );
   }
@@ -335,8 +321,8 @@ const MemoizedIndicators = memo(({ pair, timeframe, settings }: {
           "bg-background/50 hover:bg-background/80 transition-colors",
           getIndicatorColor(indicator.wt1)
         )}>
-          <Waves className="w-3 h-3" />
-          <span className="text-xs font-medium">
+          <Waves aria-hidden="true" className="w-3 h-3" />
+          <span className="text-xs font-medium tabular-nums">
             {indicator.wt1?.toFixed(1)}
           </span>
         </div>
@@ -345,8 +331,8 @@ const MemoizedIndicators = memo(({ pair, timeframe, settings }: {
           "bg-background/50 hover:bg-background/80 transition-colors",
           getIndicatorColor(indicator.wt2)
         )}>
-          <Waves className="w-3 h-3" />
-          <span className="text-xs font-medium">
+          <Waves aria-hidden="true" className="w-3 h-3" />
+          <span className="text-xs font-medium tabular-nums">
             {indicator.wt2?.toFixed(1)}
           </span>
         </div>
@@ -355,8 +341,8 @@ const MemoizedIndicators = memo(({ pair, timeframe, settings }: {
           "bg-background/50 hover:bg-background/80 transition-colors",
           getRsiColor(indicator.rsi)
         )}>
-          <LineChart className="w-3 h-3" />
-          <span className="text-xs font-medium">
+          <LineChart aria-hidden="true" className="w-3 h-3" />
+          <span className="text-xs font-medium tabular-nums">
             {indicator.rsi?.toFixed(1)}
           </span>
         </div>
@@ -428,11 +414,36 @@ const PairsTable = () => {
   const [previousPrices, setPreviousPrices] = useState<Record<string, number>>({});
   const [timeframes, setTimeframes] = useState<Timeframe[]>([]);
   const [crossSignals, setCrossSignals] = useState<CrossSignals[]>([]);
-  const [sortByBuySignals, setSortByBuySignals] = useState(false);
+  const [sortByBuySignals, setSortByBuySignals] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const saved = localStorage.getItem('sortByBuySignals');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState('');
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({});
+  // Lazy state initialization - read from localStorage only once on mount
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const saved = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [playBell, setPlayBell] = useState<(() => void) | null>(null);
-  const [settings, setSettings] = useState<WaveTrendSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<WaveTrendSettings>(() => {
+    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Load saved order on mount
@@ -448,33 +459,12 @@ const PairsTable = () => {
     }
   }, []);
 
-  // Add with other useEffects
-  useEffect(() => {
-    const savedSort = localStorage.getItem('sortByBuySignals');
-    if (savedSort) {
-      setSortByBuySignals(JSON.parse(savedSort));
-    }
-  }, []);
 
-  // Replace the audio initialization effect with this
+  // Initialize bell sound on mount
   useEffect(() => {
-    // Initialize bell sound
     setPlayBell(() => createBellSound());
-    
-    // Load notification settings from localStorage
-    const savedSettings = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
-    if (savedSettings) {
-      setNotificationSettings(JSON.parse(savedSettings));
-    }
   }, []);
 
-  // Add this effect to load saved settings
-  useEffect(() => {
-    const savedSettings = localStorage.getItem(SETTINGS_KEY);
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
-    }
-  }, []);
 
   // Add useEffect to load pinned pairs on mount
   useEffect(() => {
@@ -490,30 +480,16 @@ const PairsTable = () => {
     }
   }, []);
 
-  // Add this useEffect to request notification permission on component mount
+  // Request notification permission on mount
   useEffect(() => {
-    if ('Notification' in window) {
-      // Request permission on component mount
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(permission => {
-          console.log('Notification permission status:', permission);
-        });
-      }
-      
-      // Log current permission status
-      console.log('Current notification permission:', Notification.permission);
-    } else {
-      console.log('Notifications not supported in this browser');
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
     }
   }, []);
 
   // Update the handleIndicatorMessage function
   const handleIndicatorMessage = (data: WaveTrendMessage) => {
-    console.log('Received indicator message:', data);
-    console.log('Current settings:', settings);
-    
     const signal = calculateSignal(data.wt1, settings);
-    console.log('Calculated signal:', signal);
     
     setTimeframes(current => {
       if (!current.includes(data.timeframe as Timeframe)) {
@@ -571,132 +547,83 @@ const PairsTable = () => {
 
   const connectWebSocket = () => {
     setIsLoading(true);
-    
-    try {
-        //const url = 'ws://localhost:8765'
-        const url = process.env.NEXT_PUBLIC_WSS_URL;//'wss://your-trading-bot.fly.dev/ws'
 
-        console.log('🔄 Attempting WebSocket connection to:', url);
-        
+    try {
+        const url = process.env.NEXT_PUBLIC_WSS_URL;
+
         // Close existing connection if any
         if (ws) {
-            console.log('🔌 Closing existing connection');
             ws.close();
         }
 
         if (!url) {
-            console.error('❌ WebSocket URL is undefined');
             setIsLoading(false);
             return;
         }
 
         const testWs = new WebSocket(url);
-            
+
         testWs.onopen = () => {
-            console.log('🟢 WebSocket connection established');
-            // Reset reconnection counter on successful connection
             reconnectAttempts.current = 0;
             setIsConnected(true);
             setIsLoading(false);
             setWs(testWs);
-            
-            // Send initial subscription message with all symbols
+
             const symbols = pairs.map(pair => pair.symbol);
             const subscribeMessage = {
               type: 'subscribe',
               symbols: symbols
             };
             testWs.send(JSON.stringify(subscribeMessage));
-            console.log('📤 Sent subscription message for symbols:', symbols);
         };
-            
+
         testWs.onclose = (event) => {
-            console.log('🔴 WebSocket connection closed:', {
-                code: event.code,
-                reason: event.reason,
-                wasClean: event.wasClean,
-                timestamp: new Date().toISOString(),
-                attempts: reconnectAttempts.current
-            });
-            
             setIsConnected(false);
             setIsLoading(false);
             setWs(null);
 
-            // Clear any existing timeout
             if (reconnectTimeoutId.current) {
                 clearTimeout(reconnectTimeoutId.current);
             }
 
-            // Only reconnect if:
-            // 1. Not a clean close (user didn't intentionally disconnect)
-            // 2. Haven't exceeded max attempts
-            // 3. Error code suggests temporary issue (1006 = abnormal closure)
-            if (!event.wasClean && 
-                reconnectAttempts.current < maxReconnectAttempts.current && 
+            // Reconnect with exponential backoff for temporary issues
+            if (!event.wasClean &&
+                reconnectAttempts.current < maxReconnectAttempts.current &&
                 (event.code === 1006 || event.code === 1001 || event.code === 1011)) {
-                
+
                 reconnectAttempts.current++;
-                // Exponential backoff: 2^attempts * 1000ms (1s, 2s, 4s, 8s, 16s)
                 const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000);
-                
-                console.log(`🔄 Scheduling reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts.current} in ${delay}ms...`);
-                
+
                 reconnectTimeoutId.current = setTimeout(() => {
-                    console.log(`🔄 Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts.current})...`);
                     connectWebSocket();
                 }, delay);
-            } else {
-                console.log('❌ Not reconnecting:', {
-                    wasClean: event.wasClean,
-                    attempts: reconnectAttempts.current,
-                    maxAttempts: maxReconnectAttempts.current,
-                    code: event.code
-                });
             }
         };
-            
-        testWs.onerror = (error) => {
-            console.error('❌ WebSocket error occurred:', {
-                error: error,
-                timestamp: new Date().toISOString(),
-                readyState: testWs.readyState,
-                readyStateString: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][testWs.readyState],
-                url: url
-            });
+
+        testWs.onerror = () => {
             setIsLoading(false);
             setIsConnected(false);
         };
-            
+
         testWs.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                console.log('📨 Received message type:', message.type);
-                
+
                 if (message.type === 'connection') {
-                    console.log('🔗 Connection established:', message.message);
-                    // Handle initial data if provided
                     if (message.data) {
-                        console.log('📋 Processing initial trading data');
                         processTraidingData(message.data);
                     }
                 } else if (message.type === 'trading_data') {
-                    console.log('📊 Processing trading data update');
                     processTraidingData(message.data);
                 } else if (message.type === 'indicators') {
-                    // Legacy support
                     handleIndicatorMessage(message as WaveTrendMessage);
-                } else {
-                    console.log('🔍 Unknown message type:', message.type);
                 }
-            } catch (error) {
-                console.error('😵 Error parsing WebSocket message:', error);
+            } catch {
+                // Message parsing failed silently
             }
         };
-        
-        // Function to process trading data from WebSocket
+
         const processTraidingData = (data: any) => {
-            // Convert backend data format to frontend format
             Object.keys(data).forEach(symbol => {
                 const symbolData = data[symbol];
                 Object.keys(symbolData).forEach(timeframe => {
@@ -708,8 +635,7 @@ const PairsTable = () => {
             });
         };
 
-    } catch (error) {
-        console.error('💥 Failed to setup WebSocket:', error);
+    } catch {
         setIsLoading(false);
         setIsConnected(false);
     }
@@ -718,19 +644,17 @@ const PairsTable = () => {
   useEffect(() => {
     if (connectionAttempted.current) return;
     connectionAttempted.current = true;
-    
+
     connectWebSocket();
 
-    // Cleanup function
     return () => {
         if (ws) {
-            console.log('🧹 Cleaning up WebSocket connection');
-            ws.close(1000, 'Component unmounting'); // 1000 is normal closure
+            ws.close(1000, 'Component unmounting');
             setWs(null);
             setIsConnected(false);
         }
     };
-}, []); // Ensure this array is empty to run only once on mount
+  }, []);
 
   // Clean up expired signals
   useEffect(() => {
@@ -778,18 +702,15 @@ const PairsTable = () => {
     );
   };
 
-  // Modify the connect button handler
   const handleConnectionToggle = () => {
     if (isConnected && ws) {
-        console.log('👋 User initiated disconnect');
         ws.close(1000, 'User initiated disconnect');
         setWs(null);
         setIsConnected(false);
     } else {
-        console.log('🤝 User initiated connect');
         connectWebSocket();
     }
-};
+  };
 
   // Add this function to handle drag end
   const onDragEnd = (result: any) => {
@@ -816,45 +737,6 @@ const PairsTable = () => {
     pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleAlert = (symbol: string) => {
-    setPairs(current =>
-      current.map(pair =>
-        pair.symbol === symbol
-          ? { ...pair, alerts: !pair.alerts }
-          : pair
-      )
-    );
-
-    // Update notification settings in state and localStorage
-    setNotificationSettings(prev => {
-      const newSettings = {
-        ...prev,
-        [symbol]: !prev[symbol]
-      };
-      localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(newSettings));
-      return newSettings;
-    });
-  };
-
-  // Update the togglePin function to use localStorage
-  const togglePin = (symbol: string) => {
-    setPairs(current => {
-      const updatedPairs = current.map(pair =>
-        pair.symbol === symbol
-          ? { ...pair, pinned: !pair.pinned }
-          : pair
-      );
-      
-      // Save pinned status to localStorage
-      const pinnedPairsMap = updatedPairs.reduce((acc, pair) => ({
-        ...acc,
-        [pair.symbol]: pair.pinned
-      }), {});
-      localStorage.setItem(PINNED_PAIRS_KEY, JSON.stringify(pinnedPairsMap));
-      
-      return updatedPairs;
-    });
-  };
 
   // Use memoized sorted pairs
   const sortedPairs = useSortedPairs(pairs, sortByBuySignals, searchQuery);
@@ -865,13 +747,42 @@ const PairsTable = () => {
     []
   );
 
-  // 5. Memoize handlers
+  // Memoize handlers with functional setState for stable references
   const handleAlert = useCallback((symbol: string) => {
-    toggleAlert(symbol);
+    setPairs(current =>
+      current.map(pair =>
+        pair.symbol === symbol
+          ? { ...pair, alerts: !pair.alerts }
+          : pair
+      )
+    );
+
+    setNotificationSettings(prev => {
+      const newSettings = {
+        ...prev,
+        [symbol]: !prev[symbol]
+      };
+      localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(newSettings));
+      return newSettings;
+    });
   }, []);
 
   const handlePin = useCallback((symbol: string) => {
-    togglePin(symbol);
+    setPairs(current => {
+      const updatedPairs = current.map(pair =>
+        pair.symbol === symbol
+          ? { ...pair, pinned: !pair.pinned }
+          : pair
+      );
+
+      const pinnedPairsMap = updatedPairs.reduce((acc, pair) => ({
+        ...acc,
+        [pair.symbol]: pair.pinned
+      }), {});
+      localStorage.setItem(PINNED_PAIRS_KEY, JSON.stringify(pinnedPairsMap));
+
+      return updatedPairs;
+    });
   }, []);
 
   const handleSortToggle = (checked: boolean) => {
@@ -879,7 +790,7 @@ const PairsTable = () => {
     localStorage.setItem('sortByBuySignals', JSON.stringify(checked));
   };
 
-  // 6. Update the table row rendering
+  // Memoize table row rendering
   const renderTableRow = useCallback((pair: TradingPair, index: number) => (
     <Draggable
       key={pair.symbol}
@@ -904,10 +815,12 @@ const PairsTable = () => {
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={notificationSettings[pair.symbol] ? `Disable alerts for ${pair.symbol}` : `Enable alerts for ${pair.symbol}`}
+                  aria-pressed={notificationSettings[pair.symbol]}
                   className={cn(
                     "icon-button h-7 w-7",
                     notificationSettings[pair.symbol]
-                      ? "text-amber-500 active-icon" 
+                      ? "text-amber-500 active-icon"
                       : "text-gray-400 hover:text-amber-400"
                   )}
                   onClick={(e) => {
@@ -916,9 +829,10 @@ const PairsTable = () => {
                   }}
                 >
                   <Bell
+                    aria-hidden="true"
                     className={cn(
                       "bell-icon h-4 w-4",
-                      notificationSettings[pair.symbol] && "animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                      notificationSettings[pair.symbol] && "motion-safe:animate-[wiggle_0.5s_cubic-bezier(0.36,0,0.66,1)]"
                     )}
                   />
                 </Button>
@@ -934,10 +848,12 @@ const PairsTable = () => {
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={pair.pinned ? `Unpin ${pair.symbol}` : `Pin ${pair.symbol}`}
+                  aria-pressed={pair.pinned}
                   className={cn(
                     "icon-button h-7 w-7",
-                    pair.pinned 
-                      ? "text-blue-500 active-icon" 
+                    pair.pinned
+                      ? "text-blue-500 active-icon"
                       : "text-gray-400 hover:text-blue-400"
                   )}
                   onClick={(e) => {
@@ -946,9 +862,10 @@ const PairsTable = () => {
                   }}
                 >
                   <Pin
+                    aria-hidden="true"
                     className={cn(
                       "pin-icon h-4 w-4",
-                      pair.pinned && "animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
+                      pair.pinned && "motion-safe:animate-[bounce_0.5s_cubic-bezier(0.36,0,0.66,1)]"
                     )}
                   />
                 </Button>
@@ -960,7 +877,7 @@ const PairsTable = () => {
               </div>
             </div>
           </TableCell>
-          <TableCell className="text-right pr-6">
+          <TableCell className="text-right pr-6 tabular-nums">
             {pair.price?.toFixed(4)}
           </TableCell>
           {timeframes.map((tf) => (
@@ -978,16 +895,14 @@ const PairsTable = () => {
         </TableRow>
       )}
     </Draggable>
-  ), [timeframes, settings]);
+  ), [timeframes, settings, notificationSettings, sortByBuySignals, handleAlert, handlePin]);
 
   // Add this function to test the bell sound
   const testBellSound = () => {
     playBell?.();
   };
 
-  // Modify saveSettings to include debugging
   const saveSettings = (newSettings: WaveTrendSettings) => {
-    console.log('Saving new settings:', newSettings);
     setSettings(newSettings);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
     
@@ -1036,10 +951,11 @@ const PairsTable = () => {
           <Button
             variant="outline"
             size="icon"
+            aria-label="Open WaveTrend settings"
             onClick={() => setShowSettingsModal(true)}
             className="h-9 w-9 flex-shrink-0"
           >
-            <Settings className="h-4 w-4" />
+            <Settings aria-hidden="true" className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -1102,7 +1018,7 @@ const PairsTable = () => {
               onClick={() => testNotification(playBell || (() => {}))}
               className="flex items-center gap-2"
             >
-              <Bell className="h-4 w-4" />
+              <Bell aria-hidden="true" className="h-4 w-4" />
               Test Notifications
             </Button>
           </div>

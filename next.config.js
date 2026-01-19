@@ -13,7 +13,7 @@ const nextConfig = {
     ];
   },
   experimental: {
-    runtime: 'edge',  // This enables the native fetch API
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
 };
 
